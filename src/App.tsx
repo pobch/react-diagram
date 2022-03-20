@@ -66,17 +66,40 @@ export function App() {
     setAction('none')
   }
 
-  // Rendering frame by frame
+  // * ----------- Clear Canvas -------------
+
+  function handleClickClear() {
+    if (!canvasRef.current) return
+
+    const canvas = canvasRef.current
+    const context = canvas?.getContext('2d')
+    context?.clearRect(0, 0, canvas.width, canvas.height)
+    setElements([])
+  }
+
+  // * ------------ Canvas Drawing ------------
+
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   useLayoutEffect(() => {
     if (!canvasRef.current) return
 
+    function setupDPR(canvas: HTMLCanvasElement) {
+      // Get the device pixel ratio, falling back to 1.
+      var dpr = window.devicePixelRatio || 1
+      // Get the size of the canvas in CSS pixels.
+      var rect = canvas.getBoundingClientRect()
+      // Give the canvas pixel dimensions of their CSS
+      // size * the device pixel ratio.
+      canvas.width = rect.width * dpr
+      canvas.height = rect.height * dpr
+      var ctx = canvas.getContext('2d')
+      // Scale all drawing operations by the dpr, so you
+      // don't have to worry about the difference.
+      ctx?.scale(dpr, dpr)
+      return ctx
+    }
     const canvas = canvasRef.current
-    canvas.width = window.devicePixelRatio * window.innerWidth
-    canvas.height = window.devicePixelRatio * window.innerHeight
-    const context = canvas.getContext('2d')
-    //CSS pixels for coordinate systems
-    context?.scale(window.devicePixelRatio, window.devicePixelRatio)
+    const context = setupDPR(canvas)
 
     context?.clearRect(0, 0, canvas.width, canvas.height)
 
@@ -108,6 +131,7 @@ export function App() {
           onChange={() => setTool('rectangle')}
         />
         <label htmlFor="rectangle">Rectangle</label>
+        <button onClick={handleClickClear}>Clear</button>
       </div>
 
       {/* Canvas */}
