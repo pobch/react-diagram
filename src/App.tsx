@@ -35,6 +35,20 @@ export function App() {
       }
       setElements((prevState) => [...prevState, newElement])
       setAction('drawing')
+    } else if (tool === 'rectangle') {
+      const id = elements.length
+      const roughElement = generator.rectangle(clientX, clientY, 0, 0)
+      const newElement = {
+        id: id,
+        x1: clientX,
+        y1: clientY,
+        x2: clientX,
+        y2: clientY,
+        type: tool,
+        roughElement,
+      }
+      setElements((prevState) => [...prevState, newElement])
+      setAction('drawing')
     }
   }
 
@@ -45,8 +59,26 @@ export function App() {
       const lastIndex = elements.length - 1
       const { x1: currentX1, y1: currentY1 } = elements[lastIndex]
       const elementsCopy = [...elements]
+
       if (tool === 'line') {
         const roughElement = generator.line(currentX1, currentY1, clientX, clientY)
+        const newElement = {
+          id: lastIndex,
+          x1: currentX1,
+          y1: currentY1,
+          x2: clientX,
+          y2: clientY,
+          type: tool,
+          roughElement,
+        }
+        elementsCopy[lastIndex] = newElement
+      } else if (tool === 'rectangle') {
+        const roughElement = generator.rectangle(
+          currentX1,
+          currentY1,
+          clientX - currentX1,
+          clientY - currentY1
+        )
         const newElement = {
           id: lastIndex,
           x1: currentX1,
@@ -105,7 +137,7 @@ export function App() {
 
     const roughCanvas = rough.canvas(canvas)
     elements.forEach((element) => {
-      if (element.type === 'line') {
+      if (element.type === 'line' || element.type === 'rectangle') {
         roughCanvas.draw(element.roughElement)
       }
     })
