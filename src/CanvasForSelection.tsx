@@ -1,5 +1,5 @@
-import { useLayoutEffect, useRef, useState } from 'react'
-import rough from 'roughjs/bundled/rough.esm'
+import * as React from 'react'
+import { useState } from 'react'
 import { createLineElement } from './CanvasForLine'
 import { createRectangleElement } from './CanvasForRect'
 import { TElementData } from './App'
@@ -48,13 +48,16 @@ function getFirstElementAtPosition({
   }
 }
 
-export function CanvasForSelection({
-  elements,
-  setElements,
-}: {
-  elements: TElementData[]
-  setElements: React.Dispatch<TElementData[]>
-}) {
+export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
+  {
+    elements,
+    setElements,
+  }: {
+    elements: TElementData[]
+    setElements: React.Dispatch<TElementData[]>
+  },
+  canvasRef: React.Ref<HTMLCanvasElement>
+) {
   const [action, setAction] = useState<'none' | 'moving'>('none')
   const [selectedElementWithPointerOffset, setSelectedElementWithPointerOffset] = useState<
     TElementWithPointerOffsetData | undefined
@@ -118,40 +121,6 @@ export function CanvasForSelection({
     return
   }
 
-  // * ------------ Canvas Drawing ------------
-  // TODO: extract this into reusable hook
-  const canvasRef = useRef<HTMLCanvasElement | null>(null)
-  useLayoutEffect(() => {
-    if (!canvasRef.current) return
-
-    function setupDPR(canvas: HTMLCanvasElement) {
-      // Get the device pixel ratio, falling back to 1.
-      var dpr = window.devicePixelRatio || 1
-      // Get the size of the canvas in CSS pixels.
-      var rect = canvas.getBoundingClientRect()
-      // Give the canvas pixel dimensions of their CSS
-      // size * the device pixel ratio.
-      canvas.width = rect.width * dpr
-      canvas.height = rect.height * dpr
-      var ctx = canvas.getContext('2d')
-      // Scale all drawing operations by the dpr, so you
-      // don't have to worry about the difference.
-      ctx?.scale(dpr, dpr)
-      return ctx
-    }
-    const canvas = canvasRef.current
-    const context = setupDPR(canvas)
-
-    context?.clearRect(0, 0, canvas.width, canvas.height)
-
-    const roughCanvas = rough.canvas(canvas)
-    elements.forEach((element) => {
-      if (element.type === 'line' || element.type === 'rectangle') {
-        roughCanvas.draw(element.roughElement)
-      }
-    })
-  }, [elements])
-
   return (
     <canvas
       ref={canvasRef}
@@ -170,4 +139,4 @@ export function CanvasForSelection({
       My Canvas
     </canvas>
   )
-}
+})
