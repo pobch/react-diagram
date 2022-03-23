@@ -1,15 +1,10 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { createLineElement } from './CanvasForLine'
+import { adjustLineCoordinates, createLineElement } from './CanvasForLine'
 import { createRectangleElement } from './CanvasForRect'
 import { TElementData } from './App'
 
-type TElementWithPointerOffsetData = TElementData & {
-  pointerOffsetX1: number
-  pointerOffsetY1: number
-}
-
-function getFirstElementAtPosition({
+function getFirstElmDataAtPosition({
   dataSource,
   xPosition,
   yPosition,
@@ -17,37 +12,208 @@ function getFirstElementAtPosition({
   dataSource: TElementData[]
   xPosition: number
   yPosition: number
-}): TElementWithPointerOffsetData | undefined {
+}): TActionData | undefined {
   function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
     return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
   }
-  const foundElement = dataSource.find((element) => {
+  function isNearPoint({
+    xPosition,
+    yPosition,
+    xPoint,
+    yPoint,
+  }: {
+    xPosition: number
+    yPosition: number
+    xPoint: number
+    yPoint: number
+  }): boolean {
+    return Math.abs(xPosition - xPoint) < 5 && Math.abs(yPosition - yPoint) < 5
+  }
+
+  // in case of not found, it will be undefined
+  let foundElement: TActionData | undefined = undefined
+
+  for (let element of dataSource) {
     if (element.type === 'line') {
+      // check if a pointer is at left-end
+      if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'line',
+          pointerPosition: 'left',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is at right-end
+      else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'line',
+          pointerPosition: 'right',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is inside the line
       const a = { x: element.x1, y: element.y1 }
       const b = { x: element.x2, y: element.y2 }
       const c = { x: xPosition, y: yPosition }
       const distanceOffset = distance(a, b) - (distance(a, c) + distance(b, c))
-      return Math.abs(distanceOffset) < 1
+      if (Math.abs(distanceOffset) < 1) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'line',
+          pointerPosition: 'inside',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      continue
     } else if (element.type === 'rectangle') {
-      const minX = Math.min(element.x1, element.x2)
-      const maxX = Math.max(element.x1, element.x2)
-      const minY = Math.min(element.y1, element.y2)
-      const maxY = Math.max(element.y1, element.y2)
-      return minX <= xPosition && xPosition <= maxX && minY <= yPosition && yPosition <= maxY
+      // check if a pointer is at top-left
+      if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'tl',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is at top-right
+      else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y1 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'tr',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is at bottom-right
+      else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'br',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is at bottom-left
+      else if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y2 })) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'bl',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      // check if a pointer is inside the rectangle
+      else if (
+        element.x1 <= xPosition &&
+        xPosition <= element.x2 &&
+        element.y1 <= yPosition &&
+        yPosition <= element.y2
+      ) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'inside',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
+      continue
     }
-    // should not reach here
-    return false
-  })
-
-  if (!foundElement) return
-
-  return {
-    ...foundElement,
-    pointerOffsetX1: xPosition - foundElement.x1,
-    pointerOffsetY1: yPosition - foundElement.y1,
   }
+
+  return foundElement
 }
 
+type TActionData =
+  | {
+      elementId: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      elementType: 'line'
+      pointerPosition: 'left' | 'right' | 'inside'
+      pointerOffsetX1: number
+      pointerOffsetY1: number
+    }
+  | {
+      elementId: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      elementType: 'rectangle'
+      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'inside'
+      pointerOffsetX1: number
+      pointerOffsetY1: number
+    }
+type TActionState =
+  | {
+      action: 'none'
+    }
+  | {
+      action: 'moving'
+      data: TActionData
+    }
+  | {
+      action: 'resizing'
+      data: TActionData
+    }
+
+/**
+ * * -----------------------------------------
+ * *               Component
+ * * -----------------------------------------
+ */
 export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
   {
     elements,
@@ -58,38 +224,78 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
   },
   canvasRef: React.Ref<HTMLCanvasElement>
 ) {
-  const [action, setAction] = useState<'none' | 'moving'>('none')
-  const [selectedElementWithPointerOffset, setSelectedElementWithPointerOffset] = useState<
-    TElementWithPointerOffsetData | undefined
-  >()
-  // TODO: implement this
-  const [cursorType, setCursorType] = useState('default')
+  const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
     const { clientX, clientY } = e
-    const selectedElemData = getFirstElementAtPosition({
+    const selectedElemData = getFirstElmDataAtPosition({
       dataSource: elements,
       xPosition: clientX,
       yPosition: clientY,
     })
+    // a pointer is not click on any elements
     if (!selectedElemData) return
-    setAction('moving')
-    setSelectedElementWithPointerOffset(selectedElemData)
-    return
+
+    // check which part of the element was clicked
+    if (selectedElemData.pointerPosition === 'inside') {
+      setActionState({ action: 'moving', data: selectedElemData })
+      return
+    } else if (
+      selectedElemData.pointerPosition === 'left' ||
+      selectedElemData.pointerPosition === 'right' ||
+      selectedElemData.pointerPosition === 'tl' ||
+      selectedElemData.pointerPosition === 'tr' ||
+      selectedElemData.pointerPosition === 'br' ||
+      selectedElemData.pointerPosition === 'bl'
+    ) {
+      setActionState({ action: 'resizing', data: selectedElemData })
+      return
+    }
   }
 
+  const [cursorType, setCursorType] = useState<'default' | 'move' | 'nesw-resize' | 'nwse-resize'>(
+    'default'
+  )
+
   function handlePointerMove(e: React.PointerEvent) {
-    if (action === 'moving' && selectedElementWithPointerOffset) {
-      const { clientX, clientY } = e
-      const newX1 = clientX - selectedElementWithPointerOffset.pointerOffsetX1
-      const newY1 = clientY - selectedElementWithPointerOffset.pointerOffsetY1
+    const { clientX, clientY } = e
+
+    // cursor UI
+    const hoveredElemData = getFirstElmDataAtPosition({
+      dataSource: elements,
+      xPosition: clientX,
+      yPosition: clientY,
+    })
+    if (!hoveredElemData) {
+      setCursorType('default')
+    } else if (hoveredElemData.pointerPosition === 'inside') {
+      setCursorType('move')
+    } else if (
+      hoveredElemData.pointerPosition === 'right' ||
+      hoveredElemData.pointerPosition === 'tr' ||
+      hoveredElemData.pointerPosition === 'br'
+    ) {
+      setCursorType('nesw-resize')
+    } else if (
+      hoveredElemData.pointerPosition === 'left' ||
+      hoveredElemData.pointerPosition === 'tl' ||
+      hoveredElemData.pointerPosition === 'bl'
+    ) {
+      setCursorType('nwse-resize')
+    }
+
+    // moving logics
+    if (actionState.action === 'moving') {
+      const newX1 = clientX - actionState.data.pointerOffsetX1
+      const newY1 = clientY - actionState.data.pointerOffsetY1
       // replace specific element
-      const index = selectedElementWithPointerOffset.id
+      const index = actionState.data.elementId
       const elementsCopy = [...elements]
 
-      if (selectedElementWithPointerOffset.type === 'line') {
-        const distanceX = selectedElementWithPointerOffset.x2 - selectedElementWithPointerOffset.x1
-        const distanceY = selectedElementWithPointerOffset.y2 - selectedElementWithPointerOffset.y1
+      if (actionState.data.elementType === 'line') {
+        // keep existing line width
+        const distanceX = actionState.data.x2 - actionState.data.x1
+        const distanceY = actionState.data.y2 - actionState.data.y1
         const newElement = createLineElement({
           id: index,
           x1: newX1,
@@ -98,9 +304,10 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
           y2: newY1 + distanceY,
         })
         elementsCopy[index] = newElement
-      } else if (selectedElementWithPointerOffset.type === 'rectangle') {
-        const width = selectedElementWithPointerOffset.x2 - selectedElementWithPointerOffset.x1
-        const height = selectedElementWithPointerOffset.y2 - selectedElementWithPointerOffset.y1
+      } else if (actionState.data.elementType === 'rectangle') {
+        // keep existing width + height
+        const width = actionState.data.x2 - actionState.data.x1
+        const height = actionState.data.y2 - actionState.data.y1
         const newElement = createRectangleElement({
           id: index,
           x1: newX1,
@@ -113,11 +320,54 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       setElements(elementsCopy)
       return
     }
+
+    // resizing logics
+    if (actionState.action === 'resizing') {
+      // replace specific element
+      const index = actionState.data.elementId
+      const elementsCopy = [...elements]
+
+      if (actionState.data.pointerPosition === 'left') {
+        const newElement = createLineElement({
+          id: index,
+          x1: clientX,
+          y1: clientY,
+          x2: actionState.data.x2,
+          y2: actionState.data.y2,
+        })
+        elementsCopy[index] = newElement
+      } else if (actionState.data.pointerPosition === 'right') {
+        const newElement = createLineElement({
+          id: index,
+          x1: actionState.data.x1,
+          y1: actionState.data.y1,
+          x2: clientX,
+          y2: clientY,
+        })
+        elementsCopy[index] = newElement
+      }
+      setElements(elementsCopy)
+    }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    setAction('none')
-    setSelectedElementWithPointerOffset(undefined)
+    // adjust coordinates to handle case resizing flips the line
+    if (actionState.action === 'resizing') {
+      const selectedIndex = actionState.data.elementId
+      const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[selectedIndex])
+      const elementsCopy = [...elements]
+      const newElement = createLineElement({
+        id: selectedIndex,
+        x1: newX1,
+        y1: newY1,
+        x2: newX2,
+        y2: newY2,
+      })
+      elementsCopy[selectedIndex] = newElement
+      setElements(elementsCopy)
+    }
+
+    setActionState({ action: 'none' })
     return
   }
 
@@ -131,6 +381,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
         height: window.innerHeight,
         // disable all touch behavior from browser, e.g. touch to scroll
         touchAction: 'none',
+        cursor: cursorType,
       }}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}

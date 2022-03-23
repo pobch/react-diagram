@@ -16,6 +16,22 @@ export function createLineElement({
   return { id: id, x1: x1, y1: y1, x2: x2, y2: y2, type: 'line', roughElement }
 }
 
+// make (x1, y1) always on the left side of (x2, y2)
+// but if x1 === x2, (x1, y1) will always on the top of (x2, y2)
+export function adjustLineCoordinates(element: TElementData) {
+  const { x1, x2, y1, y2 } = element
+  if (x1 < x2 || (x1 === x2 && y1 < y2)) {
+    return { newX1: x1, newY1: y1, newX2: x2, newY2: y2 }
+  } else {
+    return { newX1: x2, newY1: y2, newX2: x1, newY2: y1 }
+  }
+}
+
+/**
+ * * -----------------------------------------
+ * *               Component
+ * * -----------------------------------------
+ */
 export const CanvasForLine = React.forwardRef(function CanvasForLine(
   {
     elements,
@@ -66,6 +82,19 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    const lastIndex = elements.length - 1
+    const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[lastIndex])
+    const elementsCopy = [...elements]
+    const newElement = createLineElement({
+      id: lastIndex,
+      x1: newX1,
+      y1: newY1,
+      x2: newX2,
+      y2: newY2,
+    })
+    elementsCopy[lastIndex] = newElement
+    setElements(elementsCopy)
+
     setAction('none')
     return
   }
