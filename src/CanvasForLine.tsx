@@ -45,18 +45,20 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
-    const { clientX, clientY } = e
-    const nextIndex = elements.length
-    const newElement = createLineElement({
-      id: nextIndex,
-      x1: clientX,
-      y1: clientY,
-      x2: clientX,
-      y2: clientY,
-    })
-    setElements((prevState) => [...prevState, newElement])
-    setAction('drawing')
-    return
+    if (action === 'none') {
+      const { clientX, clientY } = e
+      const nextIndex = elements.length
+      const newElement = createLineElement({
+        id: nextIndex,
+        x1: clientX,
+        y1: clientY,
+        x2: clientX,
+        y2: clientY,
+      })
+      setElements((prevState) => [...prevState, newElement])
+      setAction('drawing')
+      return
+    }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -82,21 +84,24 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    const lastIndex = elements.length - 1
-    const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[lastIndex])
-    const elementsCopy = [...elements]
-    const newElement = createLineElement({
-      id: lastIndex,
-      x1: newX1,
-      y1: newY1,
-      x2: newX2,
-      y2: newY2,
-    })
-    elementsCopy[lastIndex] = newElement
-    setElements(elementsCopy)
-
-    setAction('none')
-    return
+    if (action === 'drawing') {
+      // adjust coord when finish drawing
+      const lastIndex = elements.length - 1
+      const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[lastIndex])
+      const elementsCopy = [...elements]
+      const newElement = createLineElement({
+        id: lastIndex,
+        x1: newX1,
+        y1: newY1,
+        x2: newX2,
+        y2: newY2,
+      })
+      elementsCopy[lastIndex] = newElement
+      setElements(elementsCopy)
+      // clear action
+      setAction('none')
+      return
+    }
   }
 
   return (

@@ -24,6 +24,21 @@ export function createRectangleElement({
   }
 }
 
+// make (x1, y1) always on the top-left and (x2, y2) always on the bottom-right
+export function adjustRectangleCoordinates(element: TElementData) {
+  const { x1, x2, y1, y2 } = element
+  const minX = Math.min(x1, x2)
+  const maxX = Math.max(x1, x2)
+  const minY = Math.min(y1, y2)
+  const maxY = Math.max(y1, y2)
+  return { newX1: minX, newY1: minY, newX2: maxX, newY2: maxY }
+}
+
+/**
+ * * -----------------------------------------
+ * *               Component
+ * * -----------------------------------------
+ */
 export const CanvasForRect = React.forwardRef(function CanvasForRect(
   {
     elements,
@@ -37,18 +52,20 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
-    const { clientX, clientY } = e
-    const nextIndex = elements.length
-    const newElement = createRectangleElement({
-      id: nextIndex,
-      x1: clientX,
-      y1: clientY,
-      width: 0,
-      height: 0,
-    })
-    setElements((prevState) => [...prevState, newElement])
-    setAction('drawing')
-    return
+    if (action === 'none') {
+      const { clientX, clientY } = e
+      const nextIndex = elements.length
+      const newElement = createRectangleElement({
+        id: nextIndex,
+        x1: clientX,
+        y1: clientY,
+        width: 0,
+        height: 0,
+      })
+      setElements((prevState) => [...prevState, newElement])
+      setAction('drawing')
+      return
+    }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -72,8 +89,24 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    setAction('none')
-    return
+    if (action === 'drawing') {
+      // adjust coord when finish drawing
+      const lastIndex = elements.length - 1
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elements[lastIndex])
+      const elementsCopy = [...elements]
+      const newElement = createRectangleElement({
+        id: lastIndex,
+        x1: newX1,
+        y1: newY1,
+        width: newX2 - newX1,
+        height: newY2 - newY1,
+      })
+      elementsCopy[lastIndex] = newElement
+      setElements(elementsCopy)
+      // clear action
+      setAction('none')
+      return
+    }
   }
 
   return (

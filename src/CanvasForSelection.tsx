@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import { adjustLineCoordinates, createLineElement } from './CanvasForLine'
-import { createRectangleElement } from './CanvasForRect'
+import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
 import { TElementData } from './App'
 
 function getFirstElmDataAtPosition({
@@ -273,13 +273,13 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     } else if (
       hoveredElemData.pointerPosition === 'right' ||
       hoveredElemData.pointerPosition === 'tr' ||
-      hoveredElemData.pointerPosition === 'br'
+      hoveredElemData.pointerPosition === 'bl'
     ) {
       setCursorType('nesw-resize')
     } else if (
       hoveredElemData.pointerPosition === 'left' ||
       hoveredElemData.pointerPosition === 'tl' ||
-      hoveredElemData.pointerPosition === 'bl'
+      hoveredElemData.pointerPosition === 'br'
     ) {
       setCursorType('nwse-resize')
     }
@@ -327,25 +327,66 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       const index = actionState.data.elementId
       const elementsCopy = [...elements]
 
-      if (actionState.data.pointerPosition === 'left') {
-        const newElement = createLineElement({
-          id: index,
-          x1: clientX,
-          y1: clientY,
-          x2: actionState.data.x2,
-          y2: actionState.data.y2,
-        })
-        elementsCopy[index] = newElement
-      } else if (actionState.data.pointerPosition === 'right') {
-        const newElement = createLineElement({
-          id: index,
-          x1: actionState.data.x1,
-          y1: actionState.data.y1,
-          x2: clientX,
-          y2: clientY,
-        })
-        elementsCopy[index] = newElement
+      if (actionState.data.elementType === 'line') {
+        if (actionState.data.pointerPosition === 'left') {
+          const newElement = createLineElement({
+            id: index,
+            x1: clientX,
+            y1: clientY,
+            x2: actionState.data.x2,
+            y2: actionState.data.y2,
+          })
+          elementsCopy[index] = newElement
+        } else if (actionState.data.pointerPosition === 'right') {
+          const newElement = createLineElement({
+            id: index,
+            x1: actionState.data.x1,
+            y1: actionState.data.y1,
+            x2: clientX,
+            y2: clientY,
+          })
+          elementsCopy[index] = newElement
+        }
+      } else if (actionState.data.elementType === 'rectangle') {
+        if (actionState.data.pointerPosition === 'tl') {
+          const newElement = createRectangleElement({
+            id: index,
+            x1: clientX,
+            y1: clientY,
+            width: actionState.data.x2 - clientX,
+            height: actionState.data.y2 - clientY,
+          })
+          elementsCopy[index] = newElement
+        } else if (actionState.data.pointerPosition === 'tr') {
+          const newElement = createRectangleElement({
+            id: index,
+            x1: actionState.data.x1,
+            y1: clientY,
+            width: clientX - actionState.data.x1,
+            height: actionState.data.y2 - clientY,
+          })
+          elementsCopy[index] = newElement
+        } else if (actionState.data.pointerPosition === 'br') {
+          const newElement = createRectangleElement({
+            id: index,
+            x1: actionState.data.x1,
+            y1: actionState.data.y1,
+            width: clientX - actionState.data.x1,
+            height: clientY - actionState.data.y1,
+          })
+          elementsCopy[index] = newElement
+        } else if (actionState.data.pointerPosition === 'bl') {
+          const newElement = createRectangleElement({
+            id: index,
+            x1: clientX,
+            y1: actionState.data.y1,
+            width: actionState.data.x2 - clientX,
+            height: clientY - actionState.data.y1,
+          })
+          elementsCopy[index] = newElement
+        }
       }
+
       setElements(elementsCopy)
     }
   }
@@ -354,16 +395,28 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     // adjust coordinates to handle case resizing flips the line
     if (actionState.action === 'resizing') {
       const selectedIndex = actionState.data.elementId
-      const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[selectedIndex])
       const elementsCopy = [...elements]
-      const newElement = createLineElement({
-        id: selectedIndex,
-        x1: newX1,
-        y1: newY1,
-        x2: newX2,
-        y2: newY2,
-      })
-      elementsCopy[selectedIndex] = newElement
+      if (actionState.data.elementType === 'line') {
+        const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[selectedIndex])
+        const newElement = createLineElement({
+          id: selectedIndex,
+          x1: newX1,
+          y1: newY1,
+          x2: newX2,
+          y2: newY2,
+        })
+        elementsCopy[selectedIndex] = newElement
+      } else if (actionState.data.elementType === 'rectangle') {
+        const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elements[selectedIndex])
+        const newElement = createRectangleElement({
+          id: selectedIndex,
+          x1: newX1,
+          y1: newY1,
+          width: newX2 - newX1,
+          height: newY2 - newY1,
+        })
+        elementsCopy[selectedIndex] = newElement
+      }
       setElements(elementsCopy)
     }
 
