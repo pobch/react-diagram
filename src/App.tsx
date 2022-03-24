@@ -15,9 +15,45 @@ export type TElementData = {
   roughElement: Drawable
 }
 
+export type TSnapshot = TElementData[]
+
+function useHistory() {
+  const [history, setHistory] = useState<TSnapshot[]>([[]])
+  const [currentIndex, setCurrentIndex] = useState(0)
+
+  function addNewHistory(newSnapshot: TSnapshot) {
+    setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex + 1), newSnapshot])
+    setCurrentIndex((prev) => prev + 1)
+  }
+
+  function replaceCurrentHistory(newSnapshot: TSnapshot) {
+    setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
+  }
+
+  function undo() {
+    setCurrentIndex((prev) => {
+      return prev >= 1 ? prev - 1 : 0
+    })
+  }
+
+  function redo() {
+    setCurrentIndex((prev) => {
+      return prev <= history.length - 2 ? prev + 1 : history.length - 1
+    })
+  }
+
+  return {
+    elementsSnapshot: history[currentIndex],
+    addNewHistory,
+    replaceCurrentHistory,
+    undo,
+    redo,
+  }
+}
+
 export function App() {
   const [tool, setTool] = useState<'selection' | 'line' | 'rectangle'>('selection')
-  const [elements, setElements] = useState<TElementData[]>([])
+  const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -26,10 +62,7 @@ export function App() {
   function handleClickClear() {
     if (!canvasRef.current) return
 
-    const canvas = canvasRef.current
-    const context = canvas?.getContext('2d')
-    context?.clearRect(0, 0, canvas.width, canvas.height)
-    setElements([])
+    addNewHistory([])
   }
 
   // * ------------ Canvas Drawing ------------
@@ -58,38 +91,59 @@ export function App() {
     context?.clearRect(0, 0, canvas.width, canvas.height)
 
     const roughCanvas = rough.canvas(canvas)
-    elements.forEach((element) => {
+    elementsSnapshot.forEach((element) => {
       if (element.type === 'line' || element.type === 'rectangle') {
         roughCanvas.draw(element.roughElement)
       }
     })
   }, [
-    elements,
+    elementsSnapshot,
     // also add tool as dependencies
     tool,
   ])
 
   return (
     <div>
-      {/* Menu */}
-      <div style={{ position: 'fixed' }}>
-        <input
-          type="radio"
-          id="selection"
-          checked={tool === 'selection'}
-          onChange={() => setTool('selection')}
-        />
-        <label htmlFor="selection">Selection</label>
-        <input type="radio" id="line" checked={tool === 'line'} onChange={() => setTool('line')} />
-        <label htmlFor="line">Line</label>
-        <input
-          type="radio"
-          id="rectangle"
-          checked={tool === 'rectangle'}
-          onChange={() => setTool('rectangle')}
-        />
-        <label htmlFor="rectangle">Rectangle</label>
+      {/* Top Menu */}
+      <div style={{ position: 'fixed', top: 0, padding: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="selection"
+            checked={tool === 'selection'}
+            onChange={() => setTool('selection')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="selection">Selection</label>
+        </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="line"
+            checked={tool === 'line'}
+            onChange={() => setTool('line')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="line">Line</label>
+        </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="rectangle"
+            checked={tool === 'rectangle'}
+            onChange={() => setTool('rectangle')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="rectangle">Rectangle</label>
+        </span>
         <button onClick={handleClickClear}>Clear</button>
+      </div>
+      {/* Footer Menu */}
+      <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <button onClick={() => undo()}>Undo</button>
+        </span>
+        <button onClick={() => redo()}>Redo</button>
       </div>
 
       {/* Canvas */}
@@ -97,12 +151,31 @@ export function App() {
         switch (tool) {
           case 'selection':
             return (
-              <CanvasForSelection ref={canvasRef} elements={elements} setElements={setElements} />
+              <CanvasForSelection
+                ref={canvasRef}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+              />
             )
           case 'rectangle':
-            return <CanvasForRect ref={canvasRef} elements={elements} setElements={setElements} />
+            return (
+              <CanvasForRect
+                ref={canvasRef}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+              />
+            )
           case 'line':
-            return <CanvasForLine ref={canvasRef} elements={elements} setElements={setElements} />
+            return (
+              <CanvasForLine
+                ref={canvasRef}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+              />
+            )
         }
       })()}
     </div>

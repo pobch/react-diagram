@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import { TElementData } from './App'
+import { TElementData, TSnapshot } from './App'
 
 const generator = rough.generator()
 
@@ -34,11 +34,13 @@ export function adjustLineCoordinates(element: TElementData) {
  */
 export const CanvasForLine = React.forwardRef(function CanvasForLine(
   {
-    elements,
-    setElements,
+    elementsSnapshot,
+    addNewHistory,
+    replaceCurrentHistory,
   }: {
-    elements: TElementData[]
-    setElements: React.Dispatch<React.SetStateAction<TElementData[]>>
+    elementsSnapshot: TSnapshot
+    addNewHistory: (arg: TSnapshot) => void
+    replaceCurrentHistory: (arg: TSnapshot) => void
   },
   canvasRef: React.Ref<HTMLCanvasElement>
 ) {
@@ -47,7 +49,7 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
   function handlePointerDown(e: React.PointerEvent) {
     if (action === 'none') {
       const { clientX, clientY } = e
-      const nextIndex = elements.length
+      const nextIndex = elementsSnapshot.length
       const newElement = createLineElement({
         id: nextIndex,
         x1: clientX,
@@ -55,7 +57,8 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
         x2: clientX,
         y2: clientY,
       })
-      setElements((prevState) => [...prevState, newElement])
+      const newElementsSnapshot = [...elementsSnapshot, newElement]
+      addNewHistory(newElementsSnapshot)
       setAction('drawing')
       return
     }
@@ -65,9 +68,9 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
     if (action === 'drawing') {
       const { clientX, clientY } = e
       // replace last element
-      const lastIndex = elements.length - 1
-      const { x1: currentX1, y1: currentY1 } = elements[lastIndex]
-      const elementsCopy = [...elements]
+      const lastIndex = elementsSnapshot.length - 1
+      const { x1: currentX1, y1: currentY1 } = elementsSnapshot[lastIndex]
+      const newElementsSnapshot = [...elementsSnapshot]
 
       const newElement = createLineElement({
         id: lastIndex,
@@ -76,9 +79,9 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
         x2: clientX,
         y2: clientY,
       })
-      elementsCopy[lastIndex] = newElement
+      newElementsSnapshot[lastIndex] = newElement
 
-      setElements(elementsCopy)
+      replaceCurrentHistory(newElementsSnapshot)
       return
     }
   }
@@ -86,9 +89,9 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
   function handlePointerUp(e: React.PointerEvent) {
     if (action === 'drawing') {
       // adjust coord when finish drawing
-      const lastIndex = elements.length - 1
-      const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[lastIndex])
-      const elementsCopy = [...elements]
+      const lastIndex = elementsSnapshot.length - 1
+      const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elementsSnapshot[lastIndex])
+      const newElementsSnapshot = [...elementsSnapshot]
       const newElement = createLineElement({
         id: lastIndex,
         x1: newX1,
@@ -96,8 +99,8 @@ export const CanvasForLine = React.forwardRef(function CanvasForLine(
         x2: newX2,
         y2: newY2,
       })
-      elementsCopy[lastIndex] = newElement
-      setElements(elementsCopy)
+      newElementsSnapshot[lastIndex] = newElement
+      replaceCurrentHistory(newElementsSnapshot)
       // clear action
       setAction('none')
       return

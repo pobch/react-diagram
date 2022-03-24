@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import { adjustLineCoordinates, createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
-import { TElementData } from './App'
+import { TElementData, TSnapshot } from './App'
 
 function getFirstElmDataAtPosition({
   dataSource,
@@ -216,40 +216,44 @@ type TActionState =
  */
 export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
   {
-    elements,
-    setElements,
+    elementsSnapshot,
+    addNewHistory,
+    replaceCurrentHistory,
   }: {
-    elements: TElementData[]
-    setElements: React.Dispatch<TElementData[]>
+    elementsSnapshot: TSnapshot
+    addNewHistory: (arg: TSnapshot) => void
+    replaceCurrentHistory: (arg: TSnapshot) => void
   },
   canvasRef: React.Ref<HTMLCanvasElement>
 ) {
   const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
-    const { clientX, clientY } = e
-    const selectedElemData = getFirstElmDataAtPosition({
-      dataSource: elements,
-      xPosition: clientX,
-      yPosition: clientY,
-    })
-    // a pointer is not click on any elements
-    if (!selectedElemData) return
+    if (actionState.action === 'none') {
+      const { clientX, clientY } = e
+      const selectedElemData = getFirstElmDataAtPosition({
+        dataSource: elementsSnapshot,
+        xPosition: clientX,
+        yPosition: clientY,
+      })
+      // a pointer is not click on any elements
+      if (!selectedElemData) return
 
-    // check which part of the element was clicked
-    if (selectedElemData.pointerPosition === 'inside') {
-      setActionState({ action: 'moving', data: selectedElemData })
-      return
-    } else if (
-      selectedElemData.pointerPosition === 'left' ||
-      selectedElemData.pointerPosition === 'right' ||
-      selectedElemData.pointerPosition === 'tl' ||
-      selectedElemData.pointerPosition === 'tr' ||
-      selectedElemData.pointerPosition === 'br' ||
-      selectedElemData.pointerPosition === 'bl'
-    ) {
-      setActionState({ action: 'resizing', data: selectedElemData })
-      return
+      // check which part of the element was clicked
+      if (selectedElemData.pointerPosition === 'inside') {
+        setActionState({ action: 'moving', data: selectedElemData })
+      } else if (
+        selectedElemData.pointerPosition === 'left' ||
+        selectedElemData.pointerPosition === 'right' ||
+        selectedElemData.pointerPosition === 'tl' ||
+        selectedElemData.pointerPosition === 'tr' ||
+        selectedElemData.pointerPosition === 'br' ||
+        selectedElemData.pointerPosition === 'bl'
+      ) {
+        setActionState({ action: 'resizing', data: selectedElemData })
+      }
+      const newElementsSnapshot = [...elementsSnapshot]
+      addNewHistory(newElementsSnapshot)
     }
   }
 
@@ -262,7 +266,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
 
     // cursor UI
     const hoveredElemData = getFirstElmDataAtPosition({
-      dataSource: elements,
+      dataSource: elementsSnapshot,
       xPosition: clientX,
       yPosition: clientY,
     })
@@ -290,7 +294,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       const newY1 = clientY - actionState.data.pointerOffsetY1
       // replace specific element
       const index = actionState.data.elementId
-      const elementsCopy = [...elements]
+      const newElementsSnapshot = [...elementsSnapshot]
 
       if (actionState.data.elementType === 'line') {
         // keep existing line width
@@ -303,7 +307,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
           x2: newX1 + distanceX,
           y2: newY1 + distanceY,
         })
-        elementsCopy[index] = newElement
+        newElementsSnapshot[index] = newElement
       } else if (actionState.data.elementType === 'rectangle') {
         // keep existing width + height
         const width = actionState.data.x2 - actionState.data.x1
@@ -315,9 +319,9 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
           width: width,
           height: height,
         })
-        elementsCopy[index] = newElement
+        newElementsSnapshot[index] = newElement
       }
-      setElements(elementsCopy)
+      replaceCurrentHistory(newElementsSnapshot)
       return
     }
 
@@ -325,7 +329,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     if (actionState.action === 'resizing') {
       // replace specific element
       const index = actionState.data.elementId
-      const elementsCopy = [...elements]
+      const newElementsSnapshot = [...elementsSnapshot]
 
       if (actionState.data.elementType === 'line') {
         if (actionState.data.pointerPosition === 'left') {
@@ -336,7 +340,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             x2: actionState.data.x2,
             y2: actionState.data.y2,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'right') {
           const newElement = createLineElement({
             id: index,
@@ -345,7 +349,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             x2: clientX,
             y2: clientY,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         }
       } else if (actionState.data.elementType === 'rectangle') {
         if (actionState.data.pointerPosition === 'tl') {
@@ -356,7 +360,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             width: actionState.data.x2 - clientX,
             height: actionState.data.y2 - clientY,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'tr') {
           const newElement = createRectangleElement({
             id: index,
@@ -365,7 +369,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             width: clientX - actionState.data.x1,
             height: actionState.data.y2 - clientY,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'br') {
           const newElement = createRectangleElement({
             id: index,
@@ -374,7 +378,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             width: clientX - actionState.data.x1,
             height: clientY - actionState.data.y1,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'bl') {
           const newElement = createRectangleElement({
             id: index,
@@ -383,11 +387,11 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             width: actionState.data.x2 - clientX,
             height: clientY - actionState.data.y1,
           })
-          elementsCopy[index] = newElement
+          newElementsSnapshot[index] = newElement
         }
       }
 
-      setElements(elementsCopy)
+      replaceCurrentHistory(newElementsSnapshot)
     }
   }
 
@@ -395,9 +399,11 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     // adjust coordinates to handle case resizing flips the line
     if (actionState.action === 'resizing') {
       const selectedIndex = actionState.data.elementId
-      const elementsCopy = [...elements]
+      const newElementsSnapshot = [...elementsSnapshot]
       if (actionState.data.elementType === 'line') {
-        const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(elements[selectedIndex])
+        const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(
+          elementsSnapshot[selectedIndex]
+        )
         const newElement = createLineElement({
           id: selectedIndex,
           x1: newX1,
@@ -405,9 +411,11 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
           x2: newX2,
           y2: newY2,
         })
-        elementsCopy[selectedIndex] = newElement
+        newElementsSnapshot[selectedIndex] = newElement
       } else if (actionState.data.elementType === 'rectangle') {
-        const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elements[selectedIndex])
+        const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(
+          elementsSnapshot[selectedIndex]
+        )
         const newElement = createRectangleElement({
           id: selectedIndex,
           x1: newX1,
@@ -415,9 +423,9 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
           width: newX2 - newX1,
           height: newY2 - newY1,
         })
-        elementsCopy[selectedIndex] = newElement
+        newElementsSnapshot[selectedIndex] = newElement
       }
-      setElements(elementsCopy)
+      replaceCurrentHistory(newElementsSnapshot)
     }
 
     setActionState({ action: 'none' })

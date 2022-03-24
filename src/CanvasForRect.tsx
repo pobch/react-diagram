@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import { TElementData } from './App'
+import { TElementData, TSnapshot } from './App'
 
 const generator = rough.generator()
 
@@ -41,11 +41,13 @@ export function adjustRectangleCoordinates(element: TElementData) {
  */
 export const CanvasForRect = React.forwardRef(function CanvasForRect(
   {
-    elements,
-    setElements,
+    elementsSnapshot,
+    addNewHistory,
+    replaceCurrentHistory,
   }: {
-    elements: TElementData[]
-    setElements: React.Dispatch<React.SetStateAction<TElementData[]>>
+    elementsSnapshot: TSnapshot
+    addNewHistory: (arg: TSnapshot) => void
+    replaceCurrentHistory: (arg: TSnapshot) => void
   },
   canvasRef: React.Ref<HTMLCanvasElement>
 ) {
@@ -54,7 +56,7 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
   function handlePointerDown(e: React.PointerEvent) {
     if (action === 'none') {
       const { clientX, clientY } = e
-      const nextIndex = elements.length
+      const nextIndex = elementsSnapshot.length
       const newElement = createRectangleElement({
         id: nextIndex,
         x1: clientX,
@@ -62,7 +64,8 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
         width: 0,
         height: 0,
       })
-      setElements((prevState) => [...prevState, newElement])
+      const newElementsSnapshot = [...elementsSnapshot, newElement]
+      addNewHistory(newElementsSnapshot)
       setAction('drawing')
       return
     }
@@ -72,9 +75,9 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
     if (action === 'drawing') {
       const { clientX, clientY } = e
       // replace last element
-      const lastIndex = elements.length - 1
-      const { x1: currentX1, y1: currentY1 } = elements[lastIndex]
-      const elementsCopy = [...elements]
+      const lastIndex = elementsSnapshot.length - 1
+      const { x1: currentX1, y1: currentY1 } = elementsSnapshot[lastIndex]
+      const newElementsSnapshot = [...elementsSnapshot]
       const newElement = createRectangleElement({
         id: lastIndex,
         x1: currentX1,
@@ -82,8 +85,8 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
         width: clientX - currentX1,
         height: clientY - currentY1,
       })
-      elementsCopy[lastIndex] = newElement
-      setElements(elementsCopy)
+      newElementsSnapshot[lastIndex] = newElement
+      replaceCurrentHistory(newElementsSnapshot)
       return
     }
   }
@@ -91,9 +94,9 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
   function handlePointerUp(e: React.PointerEvent) {
     if (action === 'drawing') {
       // adjust coord when finish drawing
-      const lastIndex = elements.length - 1
-      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elements[lastIndex])
-      const elementsCopy = [...elements]
+      const lastIndex = elementsSnapshot.length - 1
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elementsSnapshot[lastIndex])
+      const newElementsSnapshot = [...elementsSnapshot]
       const newElement = createRectangleElement({
         id: lastIndex,
         x1: newX1,
@@ -101,8 +104,8 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
         width: newX2 - newX1,
         height: newY2 - newY1,
       })
-      elementsCopy[lastIndex] = newElement
-      setElements(elementsCopy)
+      newElementsSnapshot[lastIndex] = newElement
+      replaceCurrentHistory(newElementsSnapshot)
       // clear action
       setAction('none')
       return
