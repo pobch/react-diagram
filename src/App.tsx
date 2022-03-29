@@ -105,7 +105,8 @@ export function App() {
   return (
     <div>
       {/* Top Menu */}
-      <div style={{ position: 'fixed', top: 0, padding: '0.5rem' }}>
+      <fieldset style={{ position: 'fixed', top: 0, margin: '0.5rem', padding: '0.25rem' }}>
+        <legend>Tool</legend>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <input
             type="radio"
@@ -136,14 +137,17 @@ export function App() {
           />
           <label htmlFor="rectangle">Rectangle</label>
         </span>
-        <button onClick={handleClickClear}>Clear</button>
-      </div>
+      </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <button onClick={() => undo()}>Undo</button>
         </span>
-        <button onClick={() => redo()}>Redo</button>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <button onClick={() => redo()}>Redo</button>
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+        <button onClick={handleClickClear}>Clear</button>
       </div>
 
       {/* Canvas */}
