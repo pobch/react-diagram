@@ -13,9 +13,12 @@ function getFirstElmDataAtPosition({
   xPosition: number
   yPosition: number
 }): TActionData | undefined {
+  // ----------------- Helpers --------------------
+  // find the distance between 2 points
   function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
     return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
   }
+  // check if (xPosition, yPosition) is near the specific point
   function isNearPoint({
     xPosition,
     yPosition,
@@ -27,8 +30,35 @@ function getFirstElmDataAtPosition({
     xPoint: number
     yPoint: number
   }): boolean {
-    return Math.abs(xPosition - xPoint) < 5 && Math.abs(yPosition - yPoint) < 5
+    const THRESHOLD = 5
+    return Math.abs(xPosition - xPoint) < THRESHOLD && Math.abs(yPosition - yPoint) < THRESHOLD
   }
+  // check if (xPosition, yPosition) is on the line
+  function isOnLine({
+    xPosition,
+    yPosition,
+    x1Line,
+    y1Line,
+    x2Line,
+    y2Line,
+  }: {
+    xPosition: number
+    yPosition: number
+    x1Line: number
+    y1Line: number
+    x2Line: number
+    y2Line: number
+  }) {
+    // a---------------b
+    //      c
+    const a = { x: x1Line, y: y1Line }
+    const b = { x: x2Line, y: y2Line }
+    const c = { x: xPosition, y: yPosition }
+    const distanceOffset = distance(a, b) - (distance(a, c) + distance(b, c))
+    const THRESHOLD = 1
+    return Math.abs(distanceOffset) < THRESHOLD
+  }
+  // ------------------ End ------------------------
 
   // in case of not found, it will be undefined
   let foundElement: TActionData | undefined = undefined
@@ -66,11 +96,16 @@ function getFirstElmDataAtPosition({
         break
       }
       // check if a pointer is on the line
-      const a = { x: element.x1, y: element.y1 }
-      const b = { x: element.x2, y: element.y2 }
-      const c = { x: xPosition, y: yPosition }
-      const distanceOffset = distance(a, b) - (distance(a, c) + distance(b, c))
-      if (Math.abs(distanceOffset) < 1) {
+      else if (
+        isOnLine({
+          xPosition,
+          yPosition,
+          x1Line: element.x1,
+          y1Line: element.y1,
+          x2Line: element.x2,
+          y2Line: element.y2,
+        })
+      ) {
         foundElement = {
           elementId: element.id,
           x1: element.x1,
@@ -146,6 +181,54 @@ function getFirstElmDataAtPosition({
         }
         break
       }
+      // check if a pointer is on the line of rectangle
+      else if (
+        isOnLine({
+          xPosition,
+          yPosition,
+          x1Line: element.x1,
+          y1Line: element.y1,
+          x2Line: element.x2,
+          y2Line: element.y1,
+        }) ||
+        isOnLine({
+          xPosition,
+          yPosition,
+          x1Line: element.x2,
+          y1Line: element.y1,
+          x2Line: element.x2,
+          y2Line: element.y2,
+        }) ||
+        isOnLine({
+          xPosition,
+          yPosition,
+          x1Line: element.x2,
+          y1Line: element.y2,
+          x2Line: element.x1,
+          y2Line: element.y2,
+        }) ||
+        isOnLine({
+          xPosition,
+          yPosition,
+          x1Line: element.x1,
+          y1Line: element.y2,
+          x2Line: element.x1,
+          y2Line: element.y1,
+        })
+      ) {
+        foundElement = {
+          elementId: element.id,
+          x1: element.x1,
+          y1: element.y1,
+          x2: element.x2,
+          y2: element.y2,
+          elementType: 'rectangle',
+          pointerPosition: 'onLine',
+          pointerOffsetX1: xPosition - element.x1,
+          pointerOffsetY1: yPosition - element.y1,
+        }
+        break
+      }
       // check if a pointer is inside the rectangle
       else if (
         element.x1 <= xPosition &&
@@ -192,7 +275,7 @@ type TActionData =
       x2: number
       y2: number
       elementType: 'rectangle'
-      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'inside'
+      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'inside' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
@@ -239,11 +322,11 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       // a pointer is not click on any elements
       if (!selectedElemData) return
 
+      // TODO: implement 'inside' when we have filled rectangle
+      if (selectedElemData.pointerPosition === 'inside') return
+
       // check which part of the element was clicked
-      if (
-        selectedElemData.pointerPosition === 'inside' ||
-        selectedElemData.pointerPosition === 'onLine'
-      ) {
+      if (selectedElemData.pointerPosition === 'onLine') {
         setActionState({ action: 'moving', data: selectedElemData })
       } else if (
         selectedElemData.pointerPosition === 'start' ||
@@ -273,12 +356,9 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       xPosition: clientX,
       yPosition: clientY,
     })
-    if (!hoveredElemData) {
+    if (!hoveredElemData || hoveredElemData.pointerPosition === 'inside') {
       setCursorType('default')
-    } else if (
-      hoveredElemData.pointerPosition === 'inside' ||
-      hoveredElemData.pointerPosition === 'onLine'
-    ) {
+    } else if (hoveredElemData.pointerPosition === 'onLine') {
       setCursorType('move')
     } else if (
       hoveredElemData.pointerPosition === 'tr' ||
