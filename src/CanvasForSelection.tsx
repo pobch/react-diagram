@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useState } from 'react'
-import { adjustLineCoordinates, createLineElement } from './CanvasForLine'
+import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
 import { TElementData, TSnapshot } from './App'
 
@@ -35,7 +35,7 @@ function getFirstElmDataAtPosition({
 
   for (let element of dataSource) {
     if (element.type === 'line') {
-      // check if a pointer is at left-end
+      // check if a pointer is at (x1, y1)
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
         foundElement = {
           elementId: element.id,
@@ -44,13 +44,13 @@ function getFirstElmDataAtPosition({
           x2: element.x2,
           y2: element.y2,
           elementType: 'line',
-          pointerPosition: 'left',
+          pointerPosition: 'start',
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
         break
       }
-      // check if a pointer is at right-end
+      // check if a pointer is at (x2, y2)
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
         foundElement = {
           elementId: element.id,
@@ -59,13 +59,13 @@ function getFirstElmDataAtPosition({
           x2: element.x2,
           y2: element.y2,
           elementType: 'line',
-          pointerPosition: 'right',
+          pointerPosition: 'end',
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
         break
       }
-      // check if a pointer is inside the line
+      // check if a pointer is on the line
       const a = { x: element.x1, y: element.y1 }
       const b = { x: element.x2, y: element.y2 }
       const c = { x: xPosition, y: yPosition }
@@ -78,7 +78,7 @@ function getFirstElmDataAtPosition({
           x2: element.x2,
           y2: element.y2,
           elementType: 'line',
-          pointerPosition: 'inside',
+          pointerPosition: 'onLine',
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
@@ -181,7 +181,7 @@ type TActionData =
       x2: number
       y2: number
       elementType: 'line'
-      pointerPosition: 'left' | 'right' | 'inside'
+      pointerPosition: 'start' | 'end' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
@@ -240,11 +240,14 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       if (!selectedElemData) return
 
       // check which part of the element was clicked
-      if (selectedElemData.pointerPosition === 'inside') {
+      if (
+        selectedElemData.pointerPosition === 'inside' ||
+        selectedElemData.pointerPosition === 'onLine'
+      ) {
         setActionState({ action: 'moving', data: selectedElemData })
       } else if (
-        selectedElemData.pointerPosition === 'left' ||
-        selectedElemData.pointerPosition === 'right' ||
+        selectedElemData.pointerPosition === 'start' ||
+        selectedElemData.pointerPosition === 'end' ||
         selectedElemData.pointerPosition === 'tl' ||
         selectedElemData.pointerPosition === 'tr' ||
         selectedElemData.pointerPosition === 'br' ||
@@ -272,16 +275,19 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     })
     if (!hoveredElemData) {
       setCursorType('default')
-    } else if (hoveredElemData.pointerPosition === 'inside') {
+    } else if (
+      hoveredElemData.pointerPosition === 'inside' ||
+      hoveredElemData.pointerPosition === 'onLine'
+    ) {
       setCursorType('move')
     } else if (
-      hoveredElemData.pointerPosition === 'right' ||
       hoveredElemData.pointerPosition === 'tr' ||
       hoveredElemData.pointerPosition === 'bl'
     ) {
       setCursorType('nesw-resize')
     } else if (
-      hoveredElemData.pointerPosition === 'left' ||
+      hoveredElemData.pointerPosition === 'start' ||
+      hoveredElemData.pointerPosition === 'end' ||
       hoveredElemData.pointerPosition === 'tl' ||
       hoveredElemData.pointerPosition === 'br'
     ) {
@@ -332,7 +338,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
       const newElementsSnapshot = [...elementsSnapshot]
 
       if (actionState.data.elementType === 'line') {
-        if (actionState.data.pointerPosition === 'left') {
+        if (actionState.data.pointerPosition === 'start') {
           const newElement = createLineElement({
             id: index,
             x1: clientX,
@@ -341,7 +347,7 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
             y2: actionState.data.y2,
           })
           newElementsSnapshot[index] = newElement
-        } else if (actionState.data.pointerPosition === 'right') {
+        } else if (actionState.data.pointerPosition === 'end') {
           const newElement = createLineElement({
             id: index,
             x1: actionState.data.x1,
@@ -396,40 +402,29 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    // adjust coordinates to handle case resizing flips the line
-    if (actionState.action === 'resizing') {
+    // adjust coordinates to handle the case when resizing flips the rectangle
+    if (actionState.action === 'resizing' && actionState.data.elementType === 'rectangle') {
       const selectedIndex = actionState.data.elementId
       const newElementsSnapshot = [...elementsSnapshot]
-      if (actionState.data.elementType === 'line') {
-        const { newX1, newX2, newY1, newY2 } = adjustLineCoordinates(
-          elementsSnapshot[selectedIndex]
-        )
-        const newElement = createLineElement({
-          id: selectedIndex,
-          x1: newX1,
-          y1: newY1,
-          x2: newX2,
-          y2: newY2,
-        })
-        newElementsSnapshot[selectedIndex] = newElement
-      } else if (actionState.data.elementType === 'rectangle') {
-        const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(
-          elementsSnapshot[selectedIndex]
-        )
-        const newElement = createRectangleElement({
-          id: selectedIndex,
-          x1: newX1,
-          y1: newY1,
-          width: newX2 - newX1,
-          height: newY2 - newY1,
-        })
-        newElementsSnapshot[selectedIndex] = newElement
-      }
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(
+        elementsSnapshot[selectedIndex]
+      )
+      const newElement = createRectangleElement({
+        id: selectedIndex,
+        x1: newX1,
+        y1: newY1,
+        width: newX2 - newX1,
+        height: newY2 - newY1,
+      })
+      newElementsSnapshot[selectedIndex] = newElement
       replaceCurrentHistory(newElementsSnapshot)
     }
 
-    setActionState({ action: 'none' })
-    return
+    // clear action
+    if (actionState.action === 'moving' || actionState.action === 'resizing') {
+      setActionState({ action: 'none' })
+      return
+    }
   }
 
   return (
