@@ -4,16 +4,24 @@ import rough from 'roughjs/bundled/rough.esm'
 import { CanvasForSelection } from './CanvasForSelection'
 import { CanvasForRect } from './CanvasForRect'
 import { CanvasForLine } from './CanvasForLine'
+import { CanvasForPencil } from './CanvasForPencil'
+import getStroke from 'perfect-freehand'
 
-export type TElementData = {
-  id: number
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-  type: 'line' | 'rectangle'
-  roughElement: Drawable
-}
+export type TElementData =
+  | {
+      id: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      type: 'line' | 'rectangle'
+      roughElement: Drawable
+    }
+  | {
+      id: number
+      type: 'pencil'
+      points: { x: number; y: number }[]
+    }
 
 export type TSnapshot = TElementData[]
 
@@ -51,8 +59,25 @@ function useHistory() {
   }
 }
 
+// copy from perfect-freehand doc
+function getSvgPathFromStroke(stroke: number[][]) {
+  if (!stroke.length) return ''
+
+  const d = stroke.reduce(
+    (acc, [x0, y0], i, arr) => {
+      const [x1, y1] = arr[(i + 1) % arr.length]
+      acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2)
+      return acc
+    },
+    ['M', ...stroke[0], 'Q']
+  )
+
+  d.push('Z')
+  return d.join(' ')
+}
+
 export function App() {
-  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle'>('selection')
+  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil'>('selection')
   const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -82,6 +107,10 @@ export function App() {
     elementsSnapshot.forEach((element) => {
       if (element.type === 'line' || element.type === 'rectangle') {
         roughCanvas.draw(element.roughElement)
+      } else if (element.type === 'pencil') {
+        const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
+        // context!.fillStyle = 'red'
+        context?.fill(new Path2D(stroke))
       }
     })
     context?.restore()
@@ -165,6 +194,16 @@ export function App() {
           />
           <label htmlFor="rectangle">Rectangle</label>
         </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="pencil"
+            checked={tool === 'pencil'}
+            onChange={() => setTool('pencil')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="pencil">Pencil</label>
+        </span>
       </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
@@ -202,6 +241,15 @@ export function App() {
           case 'line':
             return (
               <CanvasForLine
+                renderCanvas={renderCanvas}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+              />
+            )
+          case 'pencil':
+            return (
+              <CanvasForPencil
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}

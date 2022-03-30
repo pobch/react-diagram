@@ -11,7 +11,13 @@ export function createRectangleElement({
   y1,
   width,
   height,
-}: Pick<TElementData, 'id' | 'x1' | 'y1'> & { width: number; height: number }): TElementData {
+}: {
+  id: number
+  x1: number
+  y1: number
+  width: number
+  height: number
+}): Extract<TElementData, { type: 'line' | 'rectangle' }> {
   const roughElement = generator.rectangle(x1, y1, width, height)
   return {
     id: id,
@@ -25,7 +31,9 @@ export function createRectangleElement({
 }
 
 // make (x1, y1) always on the top-left and (x2, y2) always on the bottom-right
-export function adjustRectangleCoordinates(element: TElementData) {
+export function adjustRectangleCoordinates(
+  element: Extract<TElementData, { type: 'line' | 'rectangle' }>
+) {
   const { x1, x2, y1, y2 } = element
   const minX = Math.min(x1, x2)
   const maxX = Math.max(x1, x2)
@@ -80,8 +88,11 @@ export function CanvasForRect({
       const { clientX, clientY } = e
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
-      const { x1: currentX1, y1: currentY1 } = elementsSnapshot[lastIndex]
-      const newElementsSnapshot = [...elementsSnapshot]
+      const lastElement = elementsSnapshot[lastIndex]
+      if (lastElement.type !== 'rectangle') {
+        throw new Error('The last element in the current snapshot is not a "rectangle" type')
+      }
+      const { x1: currentX1, y1: currentY1 } = lastElement
       const newElement = createRectangleElement({
         id: lastIndex,
         x1: currentX1,
@@ -89,7 +100,9 @@ export function CanvasForRect({
         width: clientX - currentX1,
         height: clientY - currentY1,
       })
+      const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[lastIndex] = newElement
+
       replaceCurrentHistory(newElementsSnapshot)
       return
     }
@@ -99,8 +112,11 @@ export function CanvasForRect({
     if (action === 'drawing') {
       // adjust coord when finish drawing
       const lastIndex = elementsSnapshot.length - 1
-      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(elementsSnapshot[lastIndex])
-      const newElementsSnapshot = [...elementsSnapshot]
+      const lastElement = elementsSnapshot[lastIndex]
+      if (lastElement.type !== 'rectangle') {
+        throw new Error('The last element in the current snapshot is not a "rectangle" type')
+      }
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(lastElement)
       const newElement = createRectangleElement({
         id: lastIndex,
         x1: newX1,
@@ -108,8 +124,11 @@ export function CanvasForRect({
         width: newX2 - newX1,
         height: newY2 - newY1,
       })
+      const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[lastIndex] = newElement
+
       replaceCurrentHistory(newElementsSnapshot)
+
       // clear action
       setAction('none')
       return

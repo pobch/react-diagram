@@ -1,33 +1,41 @@
-import * as React from 'react'
 import { useState } from 'react'
-import rough from 'roughjs/bundled/rough.esm'
 import { TElementData, TSnapshot } from './App'
 
-const generator = rough.generator()
-
-export function createLineElement({
+function createPencilElement({
   id,
-  x1,
-  y1,
-  x2,
-  y2,
+  newX,
+  newY,
 }: {
   id: number
-  x1: number
-  y1: number
-  x2: number
-  y2: number
-}): Extract<TElementData, { type: 'line' | 'rectangle' }> {
-  const roughElement = generator.line(x1, y1, x2, y2)
-  return { id: id, x1: x1, y1: y1, x2: x2, y2: y2, type: 'line', roughElement }
+  newX: number
+  newY: number
+}): Extract<TElementData, { type: 'pencil' }> {
+  return {
+    id,
+    type: 'pencil',
+    points: [{ x: newX, y: newY }],
+  }
 }
 
-/**
- * * -----------------------------------------
- * *               Component
- * * -----------------------------------------
- */
-export function CanvasForLine({
+function updatePencilElement({
+  id,
+  newX,
+  newY,
+  currentPoints,
+}: {
+  id: number
+  newX: number
+  newY: number
+  currentPoints: { x: number; y: number }[]
+}): Extract<TElementData, { type: 'pencil' }> {
+  return {
+    id,
+    type: 'pencil',
+    points: [...currentPoints, { x: newX, y: newY }],
+  }
+}
+
+export function CanvasForPencil({
   renderCanvas,
   elementsSnapshot,
   addNewHistory,
@@ -49,13 +57,7 @@ export function CanvasForLine({
     if (action === 'none') {
       const { clientX, clientY } = e
       const nextIndex = elementsSnapshot.length
-      const newElement = createLineElement({
-        id: nextIndex,
-        x1: clientX,
-        y1: clientY,
-        x2: clientX,
-        y2: clientY,
-      })
+      const newElement = createPencilElement({ id: nextIndex, newX: clientX, newY: clientY })
       const newElementsSnapshot = [...elementsSnapshot, newElement]
       addNewHistory(newElementsSnapshot)
       setAction('drawing')
@@ -69,16 +71,14 @@ export function CanvasForLine({
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'line') {
-        throw new Error('The last element in the current snapshot is not a "line" type')
+      if (lastElement.type !== 'pencil') {
+        throw new Error('The last element in the snapshot is not a "pencil" type')
       }
-      const { x1: currentX1, y1: currentY1 } = lastElement
-      const newElement = createLineElement({
+      const newElement = updatePencilElement({
         id: lastIndex,
-        x1: currentX1,
-        y1: currentY1,
-        x2: clientX,
-        y2: clientY,
+        newX: clientX,
+        newY: clientY,
+        currentPoints: lastElement.points,
       })
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[lastIndex] = newElement
@@ -90,9 +90,7 @@ export function CanvasForLine({
 
   function handlePointerUp(e: React.PointerEvent) {
     if (action === 'drawing') {
-      // clear action
       setAction('none')
-      return
     }
   }
 

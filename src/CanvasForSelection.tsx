@@ -489,10 +489,11 @@ export function CanvasForSelection({
     // adjust coordinates to handle the case when resizing flips the rectangle
     if (actionState.action === 'resizing' && actionState.data.elementType === 'rectangle') {
       const selectedIndex = actionState.data.elementId
-      const newElementsSnapshot = [...elementsSnapshot]
-      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(
-        elementsSnapshot[selectedIndex]
-      )
+      const selectedElement = elementsSnapshot[selectedIndex]
+      if (selectedElement.type !== 'rectangle') {
+        throw new Error('The resizing element is not a "rectangle" type')
+      }
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(selectedElement)
       const newElement = createRectangleElement({
         id: selectedIndex,
         x1: newX1,
@@ -500,7 +501,9 @@ export function CanvasForSelection({
         width: newX2 - newX1,
         height: newY2 - newY1,
       })
+      const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[selectedIndex] = newElement
+
       replaceCurrentHistory(newElementsSnapshot)
     }
 
