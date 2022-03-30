@@ -39,18 +39,22 @@ export function adjustRectangleCoordinates(element: TElementData) {
  * *               Component
  * * -----------------------------------------
  */
-export const CanvasForRect = React.forwardRef(function CanvasForRect(
-  {
-    elementsSnapshot,
-    addNewHistory,
-    replaceCurrentHistory,
-  }: {
-    elementsSnapshot: TSnapshot
-    addNewHistory: (arg: TSnapshot) => void
-    replaceCurrentHistory: (arg: TSnapshot) => void
-  },
-  canvasRef: React.Ref<HTMLCanvasElement>
-) {
+export function CanvasForRect({
+  renderCanvas,
+  elementsSnapshot,
+  addNewHistory,
+  replaceCurrentHistory,
+}: {
+  renderCanvas: (arg: {
+    onPointerDown: (e: React.PointerEvent) => void
+    onPointerMove: (e: React.PointerEvent) => void
+    onPointerUp: (e: React.PointerEvent) => void
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
+  }) => React.ReactElement
+  elementsSnapshot: TSnapshot
+  addNewHistory: (arg: TSnapshot) => void
+  replaceCurrentHistory: (arg: TSnapshot) => void
+}) {
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -112,22 +116,9 @@ export const CanvasForRect = React.forwardRef(function CanvasForRect(
     }
   }
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        backgroundColor: 'azure',
-        display: 'block',
-        width: window.innerWidth,
-        height: window.innerHeight,
-        // disable all touch behavior from browser, e.g. touch to scroll
-        touchAction: 'none',
-      }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-    >
-      My Canvas
-    </canvas>
-  )
-})
+  return renderCanvas({
+    onPointerDown: handlePointerDown,
+    onPointerMove: handlePointerMove,
+    onPointerUp: handlePointerUp,
+  })
+}

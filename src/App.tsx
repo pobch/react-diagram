@@ -70,24 +70,12 @@ export function App() {
   useLayoutEffect(() => {
     if (!canvasRef.current) return
 
-    function setupDPR(canvas: HTMLCanvasElement) {
-      // Get the device pixel ratio, falling back to 1.
-      var dpr = window.devicePixelRatio || 1
-      // Get the size of the canvas in CSS pixels.
-      var rect = canvas.getBoundingClientRect()
-      // Give the canvas pixel dimensions of their CSS
-      // size * the device pixel ratio.
-      canvas.width = rect.width * dpr
-      canvas.height = rect.height * dpr
-      var ctx = canvas.getContext('2d')
-      // Scale all drawing operations by the dpr, so you
-      // don't have to worry about the difference.
-      ctx?.scale(dpr, dpr)
-      return ctx
-    }
     const canvas = canvasRef.current
-    const context = setupDPR(canvas)
+    const context = canvas.getContext('2d')
 
+    const dpr = window.devicePixelRatio || 1
+    context?.save()
+    context?.scale(dpr, dpr)
     context?.clearRect(0, 0, canvas.width, canvas.height)
 
     const roughCanvas = rough.canvas(canvas)
@@ -96,11 +84,51 @@ export function App() {
         roughCanvas.draw(element.roughElement)
       }
     })
+    context?.restore()
   }, [
     elementsSnapshot,
     // also add tool as dependencies
     tool,
   ])
+
+  // * --------------- Reusable renderProps ---------------
+  function renderCanvas({
+    onPointerDown,
+    onPointerMove,
+    onPointerUp,
+    styleCursor = 'default',
+  }: {
+    onPointerDown: (e: React.PointerEvent) => void
+    onPointerMove: (e: React.PointerEvent) => void
+    onPointerUp: (e: React.PointerEvent) => void
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
+  }) {
+    // Get the device pixel ratio, falling back to 1.
+    const dpr = window.devicePixelRatio || 1
+    return (
+      <canvas
+        ref={canvasRef}
+        style={{
+          backgroundColor: 'AliceBlue',
+          display: 'block',
+          width: window.innerWidth,
+          height: window.innerHeight,
+
+          // disable all touch behavior from browser, e.g. touch to scroll
+          touchAction: 'none',
+
+          cursor: styleCursor,
+        }}
+        width={window.innerWidth * dpr}
+        height={window.innerHeight * dpr}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+      >
+        My Canvas
+      </canvas>
+    )
+  }
 
   return (
     <div>
@@ -156,7 +184,7 @@ export function App() {
           case 'selection':
             return (
               <CanvasForSelection
-                ref={canvasRef}
+                renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
@@ -165,7 +193,7 @@ export function App() {
           case 'rectangle':
             return (
               <CanvasForRect
-                ref={canvasRef}
+                renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
@@ -174,7 +202,7 @@ export function App() {
           case 'line':
             return (
               <CanvasForLine
-                ref={canvasRef}
+                renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}

@@ -297,18 +297,22 @@ type TActionState =
  * *               Component
  * * -----------------------------------------
  */
-export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
-  {
-    elementsSnapshot,
-    addNewHistory,
-    replaceCurrentHistory,
-  }: {
-    elementsSnapshot: TSnapshot
-    addNewHistory: (arg: TSnapshot) => void
-    replaceCurrentHistory: (arg: TSnapshot) => void
-  },
-  canvasRef: React.Ref<HTMLCanvasElement>
-) {
+export function CanvasForSelection({
+  renderCanvas,
+  elementsSnapshot,
+  addNewHistory,
+  replaceCurrentHistory,
+}: {
+  renderCanvas: (arg: {
+    onPointerDown: (e: React.PointerEvent) => void
+    onPointerMove: (e: React.PointerEvent) => void
+    onPointerUp: (e: React.PointerEvent) => void
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
+  }) => React.ReactElement
+  elementsSnapshot: TSnapshot
+  addNewHistory: (arg: TSnapshot) => void
+  replaceCurrentHistory: (arg: TSnapshot) => void
+}) {
   const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
@@ -507,23 +511,10 @@ export const CanvasForSelection = React.forwardRef(function CanvasForSelection(
     }
   }
 
-  return (
-    <canvas
-      ref={canvasRef}
-      style={{
-        backgroundColor: 'azure',
-        display: 'block',
-        width: window.innerWidth,
-        height: window.innerHeight,
-        // disable all touch behavior from browser, e.g. touch to scroll
-        touchAction: 'none',
-        cursor: cursorType,
-      }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-    >
-      My Canvas
-    </canvas>
-  )
-})
+  return renderCanvas({
+    onPointerDown: handlePointerDown,
+    onPointerMove: handlePointerMove,
+    onPointerUp: handlePointerUp,
+    styleCursor: cursorType,
+  })
+}
