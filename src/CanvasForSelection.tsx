@@ -13,7 +13,8 @@ function getFirstElmDataAtPosition({
   xPosition: number
   yPosition: number
 }): TActionData | undefined {
-  // ----------------- Helpers --------------------
+  // * ----------------- Helpers --------------------
+
   // find the distance between 2 points
   function distance(a: { x: number; y: number }, b: { x: number; y: number }) {
     return Math.sqrt(Math.pow(a.x - b.x, 2) + Math.pow(a.y - b.y, 2))
@@ -41,6 +42,7 @@ function getFirstElmDataAtPosition({
     y1Line,
     x2Line,
     y2Line,
+    threshold = 1,
   }: {
     xPosition: number
     yPosition: number
@@ -48,6 +50,7 @@ function getFirstElmDataAtPosition({
     y1Line: number
     x2Line: number
     y2Line: number
+    threshold?: number
   }) {
     // a---------------b
     //      c
@@ -55,19 +58,19 @@ function getFirstElmDataAtPosition({
     const b = { x: x2Line, y: y2Line }
     const c = { x: xPosition, y: yPosition }
     const distanceOffset = distance(a, b) - (distance(a, c) + distance(b, c))
-    const THRESHOLD = 1
-    return Math.abs(distanceOffset) < THRESHOLD
+    return Math.abs(distanceOffset) < threshold
   }
-  // ------------------ End ------------------------
+  // * ------------------ End ------------------------
 
   // in case of not found, it will be undefined
-  let foundElement: TActionData | undefined = undefined
+  let firstFoundElement: TActionData | undefined = undefined
 
+  // 1st loop
   for (let element of dataSource) {
     if (element.type === 'line') {
       // check if a pointer is at (x1, y1)
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -78,11 +81,11 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is at (x2, y2)
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -93,7 +96,7 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is on the line
       else if (
@@ -106,7 +109,7 @@ function getFirstElmDataAtPosition({
           y2Line: element.y2,
         })
       ) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -117,13 +120,13 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
-      continue
+      continue // 1st loop
     } else if (element.type === 'rectangle') {
       // check if a pointer is at top-left
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -134,11 +137,11 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is at top-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y1 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -149,11 +152,11 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is at bottom-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -164,11 +167,11 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is at bottom-left
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y2 })) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -179,7 +182,7 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is on the line of rectangle
       else if (
@@ -216,7 +219,7 @@ function getFirstElmDataAtPosition({
           y2Line: element.y1,
         })
       ) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -227,7 +230,7 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
       // check if a pointer is inside the rectangle
       else if (
@@ -236,7 +239,7 @@ function getFirstElmDataAtPosition({
         element.y1 <= yPosition &&
         yPosition <= element.y2
       ) {
-        foundElement = {
+        firstFoundElement = {
           elementId: element.id,
           x1: element.x1,
           y1: element.y1,
@@ -247,37 +250,84 @@ function getFirstElmDataAtPosition({
           pointerOffsetX1: xPosition - element.x1,
           pointerOffsetY1: yPosition - element.y1,
         }
-        break
+        break // 1st loop
       }
-      continue
+      continue // 1st loop
+    } else if (element.type === 'pencil') {
+      // 2nd loop
+      for (let i = 0; i < element.points.length - 1; i++) {
+        const currentPoint = element.points[i]
+        const nextPoint = element.points[i + 1]
+        if (
+          isOnLine({
+            xPosition,
+            yPosition,
+            x1Line: currentPoint.x,
+            y1Line: currentPoint.y,
+            x2Line: nextPoint.x,
+            y2Line: nextPoint.y,
+            threshold: 6,
+          })
+        ) {
+          firstFoundElement = {
+            elementId: element.id,
+            elementType: 'pencil',
+            pointerPosition: 'onLine',
+            points: element.points,
+            pointerOffsetFromPoints: element.points.map((point) => ({
+              offsetX: xPosition - point.x,
+              offsetY: yPosition - point.y,
+            })),
+          }
+          // found an element while looping through points of a single element
+          break // 2nd loop
+        } else {
+          continue // 2nd loop
+        }
+      }
+
+      // finished looping through points of a single element
+      // if we found an element(i.e. the first element underneath a pointer), we can stop looping through remaining elements
+      if (firstFoundElement) {
+        break // 1st loop
+      } else {
+        continue // 1st loop
+      }
     }
   }
 
-  return foundElement
+  return firstFoundElement
 }
 
 type TActionData =
   | {
+      elementType: 'line'
       elementId: number
       x1: number
       y1: number
       x2: number
       y2: number
-      elementType: 'line'
       pointerPosition: 'start' | 'end' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
   | {
+      elementType: 'rectangle'
       elementId: number
       x1: number
       y1: number
       x2: number
       y2: number
-      elementType: 'rectangle'
       pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'inside' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
+    }
+  | {
+      elementType: 'pencil'
+      elementId: number
+      points: { x: number; y: number }[]
+      pointerPosition: 'onLine'
+      pointerOffsetFromPoints: { offsetX: number; offsetY: number }[]
     }
 type TActionState =
   | {
@@ -380,13 +430,13 @@ export function CanvasForSelection({
 
     // moving logics
     if (actionState.action === 'moving') {
-      const newX1 = clientX - actionState.data.pointerOffsetX1
-      const newY1 = clientY - actionState.data.pointerOffsetY1
       // replace specific element
       const index = actionState.data.elementId
       const newElementsSnapshot = [...elementsSnapshot]
 
       if (actionState.data.elementType === 'line') {
+        const newX1 = clientX - actionState.data.pointerOffsetX1
+        const newY1 = clientY - actionState.data.pointerOffsetY1
         // keep existing line width
         const distanceX = actionState.data.x2 - actionState.data.x1
         const distanceY = actionState.data.y2 - actionState.data.y1
@@ -399,6 +449,8 @@ export function CanvasForSelection({
         })
         newElementsSnapshot[index] = newElement
       } else if (actionState.data.elementType === 'rectangle') {
+        const newX1 = clientX - actionState.data.pointerOffsetX1
+        const newY1 = clientY - actionState.data.pointerOffsetY1
         // keep existing width + height
         const width = actionState.data.x2 - actionState.data.x1
         const height = actionState.data.y2 - actionState.data.y1
@@ -410,7 +462,19 @@ export function CanvasForSelection({
           height: height,
         })
         newElementsSnapshot[index] = newElement
+      } else if (actionState.data.elementType === 'pencil') {
+        const newPoints = actionState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
+          x: clientX - offsetX,
+          y: clientY - offsetY,
+        }))
+        const newElement: TElementData = {
+          id: index,
+          type: 'pencil',
+          points: newPoints,
+        }
+        newElementsSnapshot[index] = newElement
       }
+
       replaceCurrentHistory(newElementsSnapshot)
       return
     }
