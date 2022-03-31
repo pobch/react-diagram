@@ -8,6 +8,8 @@ https://react-diagram.netlify.app/
 
 ## Features
 
+https://user-images.githubusercontent.com/19894957/161126420-9802d932-2812-4a29-9822-4160cb073495.mp4
+
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
 - [x] Pencil drawing tool(free-hand)
