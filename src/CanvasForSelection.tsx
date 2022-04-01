@@ -232,26 +232,27 @@ function getFirstElmDataAtPosition({
         }
         break // 1st loop
       }
-      // check if a pointer is inside the rectangle
-      else if (
-        element.x1 <= xPosition &&
-        xPosition <= element.x2 &&
-        element.y1 <= yPosition &&
-        yPosition <= element.y2
-      ) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'inside',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
-        break // 1st loop
-      }
+      // TODO: check if a pointer is inside the rectangle after we support filled rectangle
+      // else if (
+      //   element.x1 <= xPosition &&
+      //   xPosition <= element.x2 &&
+      //   element.y1 <= yPosition &&
+      //   yPosition <= element.y2
+      // ) {
+      //   firstFoundElement = {
+      //     elementId: element.id,
+      //     x1: element.x1,
+      //     y1: element.y1,
+      //     x2: element.x2,
+      //     y2: element.y2,
+      //     elementType: 'rectangle',
+      //     pointerPosition: 'inside',
+      //     pointerOffsetX1: xPosition - element.x1,
+      //     pointerOffsetY1: yPosition - element.y1,
+      //   }
+      //   break // 1st loop
+      // }
+
       continue // 1st loop
     } else if (element.type === 'pencil') {
       // 2nd loop
@@ -318,7 +319,8 @@ type TActionData =
       y1: number
       x2: number
       y2: number
-      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'inside' | 'onLine'
+      // TODO: implement 'inside' when we have filled rectangle
+      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
@@ -377,7 +379,7 @@ export function CanvasForSelection({
       if (!selectedElemData) return
 
       // TODO: implement 'inside' when we have filled rectangle
-      if (selectedElemData.pointerPosition === 'inside') return
+      // if (selectedElemData.pointerPosition === 'inside') return
 
       // check which part of the element was clicked
       if (selectedElemData.pointerPosition === 'onLine') {
@@ -410,7 +412,8 @@ export function CanvasForSelection({
       xPosition: clientX,
       yPosition: clientY,
     })
-    if (!hoveredElemData || hoveredElemData.pointerPosition === 'inside') {
+    // TODO: implement 'inside' when we have filled rectangle
+    if (!hoveredElemData) {
       setCursorType('default')
     } else if (hoveredElemData.pointerPosition === 'onLine') {
       setCursorType('move')
