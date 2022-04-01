@@ -6,6 +6,7 @@ import { CanvasForRect } from './CanvasForRect'
 import { CanvasForLine } from './CanvasForLine'
 import { CanvasForPencil } from './CanvasForPencil'
 import getStroke from 'perfect-freehand'
+import { CanvasForText } from './CanvasForText'
 
 export type TElementData =
   | {
@@ -77,7 +78,9 @@ function getSvgPathFromStroke(stroke: number[][]) {
 }
 
 export function App() {
-  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil'>('selection')
+  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text'>(
+    'selection'
+  )
   const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -256,6 +259,8 @@ export function App() {
                 replaceCurrentHistory={replaceCurrentHistory}
               />
             )
+          case 'text':
+            return <CanvasForText />
         }
       })()}
     </div>
