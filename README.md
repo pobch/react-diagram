@@ -13,7 +13,7 @@ https://user-images.githubusercontent.com/19894957/161126420-9802d932-2812-4a29-
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
 - [x] Pencil drawing tool(free-hand)
-- [x] Selection tool for moving and resizing
+- [x] Selection tool for moving and resizing a single element
 - [x] Undo/Redo/Clear
 - [ ] Text tool
 - [ ] Support deleting a selected element
@@ -26,3 +26,5 @@ https://user-images.githubusercontent.com/19894957/161126420-9802d932-2812-4a29-
 - [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
 - [ ] Setting stroke width
+- [ ] Multiple select by click-and-drag on a selection tool
+- [ ] Filled rectangle feature
