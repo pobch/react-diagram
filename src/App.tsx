@@ -10,18 +10,25 @@ import { CanvasForText } from './CanvasForText'
 
 export type TElementData =
   | {
+      type: 'line' | 'rectangle'
       id: number
       x1: number
       y1: number
       x2: number
       y2: number
-      type: 'line' | 'rectangle'
       roughElement: Drawable
     }
   | {
-      id: number
       type: 'pencil'
+      id: number
       points: { x: number; y: number }[]
+    }
+  | {
+      type: 'text'
+      id: number
+      x1: number
+      y1: number
+      content: string
     }
 
 export type TSnapshot = TElementData[]
@@ -101,10 +108,12 @@ export function App() {
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
+    if (!context) return
+
     const dpr = window.devicePixelRatio || 1
-    context?.save()
-    context?.scale(dpr, dpr)
-    context?.clearRect(0, 0, canvas.width, canvas.height)
+    context.save()
+    context.scale(dpr, dpr)
+    context.clearRect(0, 0, canvas.width, canvas.height)
 
     const roughCanvas = rough.canvas(canvas)
     elementsSnapshot.forEach((element) => {
@@ -112,11 +121,22 @@ export function App() {
         roughCanvas.draw(element.roughElement)
       } else if (element.type === 'pencil') {
         const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
-        // context!.fillStyle = 'red'
-        context?.fill(new Path2D(stroke))
+        // context.fillStyle = 'red'
+        context.fill(new Path2D(stroke))
+      } else if (element.type === 'text') {
+        context.textBaseline = 'top'
+        context.font = '1.5rem "Nanum Pen Script"'
+        // handle multi-line text https://stackoverflow.com/a/21574562
+        const lineHeight = context.measureText('M').width * 1.2
+        const lines = element.content.split('\n')
+        let currentY = element.y1
+        for (let i = 0; i < lines.length; i++) {
+          context.fillText(lines[i], element.x1, currentY)
+          currentY = currentY + lineHeight
+        }
       }
     })
-    context?.restore()
+    context.restore()
   }, [
     elementsSnapshot,
     // also add tool as dependencies
@@ -207,6 +227,16 @@ export function App() {
           />
           <label htmlFor="pencil">Pencil</label>
         </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="text"
+            checked={tool === 'text'}
+            onChange={() => setTool('text')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="text">Text</label>
+        </span>
       </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
@@ -260,7 +290,14 @@ export function App() {
               />
             )
           case 'text':
-            return <CanvasForText />
+            return (
+              <CanvasForText
+                renderCanvas={renderCanvas}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+              />
+            )
         }
       })()}
     </div>
