@@ -655,6 +655,7 @@ export function CanvasForSelection({
 
   return (
     <>
+      {/* TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
         width={1}
@@ -663,6 +664,7 @@ export function CanvasForSelection({
       >
         For measure text
       </canvas>
+
       {renderCanvas({
         onPointerDown: handlePointerDown,
         onPointerMove: handlePointerMove,

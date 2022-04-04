@@ -232,7 +232,7 @@ export function CanvasForText({
 
       if (newContent === actionState.data.content) {
         // remove latest history and close textarea
-        // TODO: fix this hack
+        // TODO: fix this undo hack
         undoHistory()
         setActionState({ action: 'none' })
         return
@@ -270,6 +270,7 @@ export function CanvasForText({
 
   return (
     <>
+      {/* TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
         width={1}
@@ -278,6 +279,7 @@ export function CanvasForText({
       >
         For measure text
       </canvas>
+
       {actionState.action === 'creating' ? (
         <textarea
           style={{
