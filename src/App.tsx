@@ -158,11 +158,13 @@ export function App() {
     onPointerDown,
     onPointerMove,
     onPointerUp,
-    styleCursor = 'default',
+    onClick,
+    styleCursor,
   }: {
-    onPointerDown: (e: React.PointerEvent) => void
-    onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: (e: React.PointerEvent) => void
+    onPointerDown?: (e: React.PointerEvent) => void
+    onPointerMove?: (e: React.PointerEvent) => void
+    onPointerUp?: (e: React.PointerEvent) => void
+    onClick?: (e: React.MouseEvent) => void
     styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize' | 'text'
   }) {
     // Get the device pixel ratio, falling back to 1.
@@ -179,13 +181,14 @@ export function App() {
           // disable all touch behavior from browser, e.g. touch to scroll
           touchAction: 'none',
 
-          cursor: styleCursor,
+          ...(styleCursor ? { cursor: styleCursor } : {}),
         }}
         width={window.innerWidth * dpr}
         height={window.innerHeight * dpr}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onClick={onClick}
       >
         My Canvas
       </canvas>

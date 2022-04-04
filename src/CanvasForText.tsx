@@ -85,10 +85,9 @@ export function CanvasForText({
   undoHistory,
 }: {
   renderCanvas: (arg: {
-    onPointerDown: (e: React.PointerEvent) => void
     onPointerMove: (e: React.PointerEvent) => void
-    onPointerUp: (e: React.PointerEvent) => void
-    styleCursor?: 'default' | 'text'
+    onClick: (e: React.MouseEvent) => void
+    styleCursor: 'default' | 'text'
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void
@@ -123,6 +122,11 @@ export function CanvasForText({
   const [cursorType, setCursorType] = useState<'default' | 'text'>('default')
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (actionState.action === 'creating' || actionState.action === 'updating') {
+      setCursorType('default')
+      return
+    }
+
     const firstFoundElement = getTextElementAtPosition({
       elementsSnapshot,
       xPosition: e.clientX,
@@ -140,7 +144,7 @@ export function CanvasForText({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const canvasForMeasureRef = useRef<HTMLCanvasElement>(null)
 
-  function handlePointerUp(e: React.PointerEvent) {
+  function handleClick(e: React.MouseEvent) {
     // no textarea being displayed, will go to either creating or updating mode
     if (actionState.action === 'none') {
       const { clientX, clientY } = e
@@ -364,9 +368,8 @@ export function CanvasForText({
         />
       ) : null}
       {renderCanvas({
-        onPointerDown: () => {},
         onPointerMove: handlePointerMove,
-        onPointerUp: handlePointerUp,
+        onClick: handleClick,
         styleCursor: cursorType,
       })}
     </>
