@@ -8,14 +8,14 @@ https://react-diagram.netlify.app/
 
 ## Features
 
-https://user-images.githubusercontent.com/19894957/161126420-9802d932-2812-4a29-9822-4160cb073495.mp4
+https://user-images.githubusercontent.com/19894957/161531226-908ee3ea-6b3c-4b3c-bd78-f74cc399f0f6.mp4
 
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
 - [x] Pencil drawing tool(free-hand)
 - [x] Selection tool for moving and resizing a single element
 - [x] Undo/Redo/Clear
-- [ ] Text tool
+- [x] Text tool
 - [ ] Support deleting a selected element
 - [ ] Arrow drawing tool
   - https://stackoverflow.com/a/26806316
