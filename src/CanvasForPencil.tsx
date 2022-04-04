@@ -45,7 +45,6 @@ export function CanvasForPencil({
     onPointerDown: (e: React.PointerEvent) => void
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
-    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void

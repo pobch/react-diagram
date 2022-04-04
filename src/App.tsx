@@ -6,21 +6,38 @@ import { CanvasForRect } from './CanvasForRect'
 import { CanvasForLine } from './CanvasForLine'
 import { CanvasForPencil } from './CanvasForPencil'
 import getStroke from 'perfect-freehand'
+import { CanvasForText } from './CanvasForText'
 
 export type TElementData =
   | {
+      type: 'line' | 'rectangle'
       id: number
       x1: number
       y1: number
       x2: number
       y2: number
-      type: 'line' | 'rectangle'
       roughElement: Drawable
     }
   | {
-      id: number
       type: 'pencil'
+      id: number
       points: { x: number; y: number }[]
+    }
+  | {
+      type: 'text'
+      id: number
+      isWriting: boolean
+      lines: {
+        lineX1: number
+        lineY1: number
+        lineWidth: number
+        lineHeight: number
+        lineContent: string
+      }[]
+    }
+  | {
+      type: 'removed'
+      id: number
     }
 
 export type TSnapshot = TElementData[]
@@ -77,7 +94,9 @@ function getSvgPathFromStroke(stroke: number[][]) {
 }
 
 export function App() {
-  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil'>('selection')
+  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text'>(
+    'selection'
+  )
   const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -98,10 +117,12 @@ export function App() {
     const canvas = canvasRef.current
     const context = canvas.getContext('2d')
 
+    if (!context) return
+
     const dpr = window.devicePixelRatio || 1
-    context?.save()
-    context?.scale(dpr, dpr)
-    context?.clearRect(0, 0, canvas.width, canvas.height)
+    context.save()
+    context.scale(dpr, dpr)
+    context.clearRect(0, 0, canvas.width, canvas.height)
 
     const roughCanvas = rough.canvas(canvas)
     elementsSnapshot.forEach((element) => {
@@ -109,11 +130,23 @@ export function App() {
         roughCanvas.draw(element.roughElement)
       } else if (element.type === 'pencil') {
         const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
-        // context!.fillStyle = 'red'
-        context?.fill(new Path2D(stroke))
+        // context.fillStyle = 'red'
+        context.fill(new Path2D(stroke))
+      } else if (element.type === 'text' && !element.isWriting) {
+        context.textBaseline = 'top'
+        context.font = '1.5rem "Nanum Pen Script"'
+        for (let i = 0; i < element.lines.length; i++) {
+          context.fillText(
+            element.lines[i].lineContent,
+            element.lines[i].lineX1,
+            element.lines[i].lineY1
+          )
+        }
+      } else if (element.type === 'removed') {
+        // don't draw
       }
     })
-    context?.restore()
+    context.restore()
   }, [
     elementsSnapshot,
     // also add tool as dependencies
@@ -130,7 +163,7 @@ export function App() {
     onPointerDown: (e: React.PointerEvent) => void
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
-    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize' | 'text'
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
@@ -204,6 +237,16 @@ export function App() {
           />
           <label htmlFor="pencil">Pencil</label>
         </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="text"
+            checked={tool === 'text'}
+            onChange={() => setTool('text')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="text">Text</label>
+        </span>
       </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
@@ -254,6 +297,16 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+              />
+            )
+          case 'text':
+            return (
+              <CanvasForText
+                renderCanvas={renderCanvas}
+                elementsSnapshot={elementsSnapshot}
+                addNewHistory={addNewHistory}
+                replaceCurrentHistory={replaceCurrentHistory}
+                undoHistory={undo}
               />
             )
         }
