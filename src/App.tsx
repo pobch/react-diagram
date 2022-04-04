@@ -26,9 +26,18 @@ export type TElementData =
   | {
       type: 'text'
       id: number
-      x1: number
-      y1: number
-      content: string
+      isWriting: boolean
+      lines: {
+        lineX1: number
+        lineY1: number
+        lineWidth: number
+        lineHeight: number
+        lineContent: string
+      }[]
+    }
+  | {
+      type: 'removed'
+      id: number
     }
 
 export type TSnapshot = TElementData[]
@@ -123,17 +132,18 @@ export function App() {
         const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
         // context.fillStyle = 'red'
         context.fill(new Path2D(stroke))
-      } else if (element.type === 'text') {
+      } else if (element.type === 'text' && !element.isWriting) {
         context.textBaseline = 'top'
         context.font = '1.5rem "Nanum Pen Script"'
-        // handle multi-line text https://stackoverflow.com/a/21574562
-        const lineHeight = context.measureText('M').width * 1.2
-        const lines = element.content.split('\n')
-        let currentY = element.y1
-        for (let i = 0; i < lines.length; i++) {
-          context.fillText(lines[i], element.x1, currentY)
-          currentY = currentY + lineHeight
+        for (let i = 0; i < element.lines.length; i++) {
+          context.fillText(
+            element.lines[i].lineContent,
+            element.lines[i].lineX1,
+            element.lines[i].lineY1
+          )
         }
+      } else if (element.type === 'removed') {
+        // don't draw
       }
     })
     context.restore()
@@ -153,7 +163,7 @@ export function App() {
     onPointerDown: (e: React.PointerEvent) => void
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
-    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize' | 'text'
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
@@ -296,6 +306,7 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+                undoHistory={undo}
               />
             )
         }

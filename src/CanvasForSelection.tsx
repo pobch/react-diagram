@@ -1,18 +1,24 @@
 import * as React from 'react'
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
 import { TElementData, TSnapshot } from './App'
+import { createTextElement, getTextElementAtPosition } from './CanvasForText'
 
-function getFirstElmDataAtPosition({
-  dataSource,
+function getFirstElementAtPosition({
+  elementsSnapshot,
   xPosition,
   yPosition,
 }: {
-  dataSource: TElementData[]
+  elementsSnapshot: TElementData[]
   xPosition: number
   yPosition: number
-}): TActionData | undefined {
+}):
+  | {
+      pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br' | 'onLine' | 'inside' | 'none'
+      firstFoundElement: TElementData
+    }
+  | undefined {
   // * ----------------- Helpers --------------------
 
   // find the distance between 2 points
@@ -63,39 +69,23 @@ function getFirstElmDataAtPosition({
   // * ------------------ End ------------------------
 
   // in case of not found, it will be undefined
-  let firstFoundElement: TActionData | undefined = undefined
+  let firstFoundElement: TElementData | undefined = undefined
+  let pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br' | 'onLine' | 'inside' | 'none' =
+    'none'
 
   // 1st loop
-  for (let element of dataSource) {
+  for (let element of elementsSnapshot) {
     if (element.type === 'line') {
       // check if a pointer is at (x1, y1)
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'line',
-          pointerPosition: 'start',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'start'
         break // 1st loop
       }
       // check if a pointer is at (x2, y2)
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'line',
-          pointerPosition: 'end',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'end'
         break // 1st loop
       }
       // check if a pointer is on the line
@@ -109,79 +99,34 @@ function getFirstElmDataAtPosition({
           y2Line: element.y2,
         })
       ) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'line',
-          pointerPosition: 'onLine',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'onLine'
         break // 1st loop
       }
       continue // 1st loop
     } else if (element.type === 'rectangle') {
       // check if a pointer is at top-left
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'tl',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'tl'
         break // 1st loop
       }
       // check if a pointer is at top-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y1 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'tr',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'tr'
         break // 1st loop
       }
       // check if a pointer is at bottom-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'br',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'br'
         break // 1st loop
       }
       // check if a pointer is at bottom-left
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y2 })) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'bl',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'bl'
         break // 1st loop
       }
       // check if a pointer is on the line of rectangle
@@ -219,17 +164,8 @@ function getFirstElmDataAtPosition({
           y2Line: element.y1,
         })
       ) {
-        firstFoundElement = {
-          elementId: element.id,
-          x1: element.x1,
-          y1: element.y1,
-          x2: element.x2,
-          y2: element.y2,
-          elementType: 'rectangle',
-          pointerPosition: 'onLine',
-          pointerOffsetX1: xPosition - element.x1,
-          pointerOffsetY1: yPosition - element.y1,
-        }
+        firstFoundElement = element
+        pointerPosition = 'onLine'
         break // 1st loop
       }
       // TODO: check if a pointer is inside the rectangle after we support filled rectangle
@@ -239,17 +175,7 @@ function getFirstElmDataAtPosition({
       //   element.y1 <= yPosition &&
       //   yPosition <= element.y2
       // ) {
-      //   firstFoundElement = {
-      //     elementId: element.id,
-      //     x1: element.x1,
-      //     y1: element.y1,
-      //     x2: element.x2,
-      //     y2: element.y2,
-      //     elementType: 'rectangle',
-      //     pointerPosition: 'inside',
-      //     pointerOffsetX1: xPosition - element.x1,
-      //     pointerOffsetY1: yPosition - element.y1,
-      //   }
+      //   ...
       //   break // 1st loop
       // }
 
@@ -270,16 +196,8 @@ function getFirstElmDataAtPosition({
             threshold: 6,
           })
         ) {
-          firstFoundElement = {
-            elementId: element.id,
-            elementType: 'pencil',
-            pointerPosition: 'onLine',
-            points: element.points,
-            pointerOffsetFromPoints: element.points.map((point) => ({
-              offsetX: xPosition - point.x,
-              offsetY: yPosition - point.y,
-            })),
-          }
+          firstFoundElement = element
+          pointerPosition = 'onLine'
           // found an element while looping through points of a single element
           break // 2nd loop
         } else {
@@ -294,13 +212,124 @@ function getFirstElmDataAtPosition({
       } else {
         continue // 1st loop
       }
+    } else if (element.type === 'text') {
+      firstFoundElement = getTextElementAtPosition({
+        elementsSnapshot: [element],
+        xPosition,
+        yPosition,
+      })
+      if (firstFoundElement) {
+        pointerPosition = 'inside'
+        break // 1st loop
+      } else {
+        continue // 1st loop
+      }
     }
   }
 
-  return firstFoundElement
+  if (!firstFoundElement) return
+  return { pointerPosition, firstFoundElement }
 }
 
-type TActionData =
+function createMovingActionData({
+  movingElement,
+  pointerX,
+  pointerY,
+}: {
+  movingElement: TElementData
+  pointerX: number
+  pointerY: number
+}): TMovingActionData {
+  switch (movingElement.type) {
+    case 'line':
+      return {
+        elementType: 'line',
+        elementId: movingElement.id,
+        x1: movingElement.x1,
+        y1: movingElement.y1,
+        x2: movingElement.x2,
+        y2: movingElement.y2,
+        pointerOffsetX1: pointerX - movingElement.x1,
+        pointerOffsetY1: pointerY - movingElement.y1,
+      }
+    case 'rectangle':
+      return {
+        elementType: 'rectangle',
+        elementId: movingElement.id,
+        x1: movingElement.x1,
+        y1: movingElement.y1,
+        x2: movingElement.x2,
+        y2: movingElement.y2,
+        pointerOffsetX1: pointerX - movingElement.x1,
+        pointerOffsetY1: pointerY - movingElement.y1,
+      }
+    case 'pencil':
+      return {
+        elementType: 'pencil',
+        elementId: movingElement.id,
+        pointerOffsetFromPoints: movingElement.points.map((point) => ({
+          offsetX: pointerX - point.x,
+          offsetY: pointerY - point.y,
+        })),
+      }
+    case 'text':
+      return {
+        elementType: 'text',
+        elementId: movingElement.id,
+        pointerOffsetX1: pointerX - movingElement.lines[0].lineX1,
+        pointerOffsetY1: pointerY - movingElement.lines[0].lineY1,
+        content: movingElement.lines.map(({ lineContent }) => lineContent).join('\n'),
+      }
+    default:
+      throw new Error('Unsupported moving element type')
+  }
+}
+
+function createResizingActionData({
+  resizingElement,
+  pointerPosition,
+}: {
+  resizingElement: TElementData
+  pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br'
+}): TResizingActionData {
+  switch (resizingElement.type) {
+    case 'line':
+      if (pointerPosition !== 'start' && pointerPosition !== 'end') {
+        throw new Error('Impossible pointer position for resizing line element')
+      }
+      return {
+        elementType: 'line',
+        elementId: resizingElement.id,
+        x1: resizingElement.x1,
+        y1: resizingElement.y1,
+        x2: resizingElement.x2,
+        y2: resizingElement.y2,
+        pointerPosition: pointerPosition,
+      }
+    case 'rectangle':
+      if (
+        pointerPosition !== 'tl' &&
+        pointerPosition !== 'tr' &&
+        pointerPosition !== 'bl' &&
+        pointerPosition !== 'br'
+      ) {
+        throw new Error('Impossible pointer position for resizing rectangle element')
+      }
+      return {
+        elementType: 'rectangle',
+        elementId: resizingElement.id,
+        x1: resizingElement.x1,
+        y1: resizingElement.y1,
+        x2: resizingElement.x2,
+        y2: resizingElement.y2,
+        pointerPosition: pointerPosition,
+      }
+    default:
+      throw new Error('Unsupported resizing element type')
+  }
+}
+
+type TMovingActionData =
   | {
       elementType: 'line'
       elementId: number
@@ -308,7 +337,6 @@ type TActionData =
       y1: number
       x2: number
       y2: number
-      pointerPosition: 'start' | 'end' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
@@ -319,29 +347,52 @@ type TActionData =
       y1: number
       x2: number
       y2: number
-      // TODO: implement 'inside' when we have filled rectangle
-      pointerPosition: 'tl' | 'tr' | 'bl' | 'br' | 'onLine'
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
   | {
       elementType: 'pencil'
       elementId: number
-      points: { x: number; y: number }[]
-      pointerPosition: 'onLine'
       pointerOffsetFromPoints: { offsetX: number; offsetY: number }[]
     }
+  | {
+      elementType: 'text'
+      elementId: number
+      pointerOffsetX1: number
+      pointerOffsetY1: number
+      content: string
+    }
+type TResizingActionData =
+  | {
+      elementType: 'line'
+      elementId: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      pointerPosition: 'start' | 'end'
+    }
+  | {
+      elementType: 'rectangle'
+      elementId: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
+    }
+
 type TActionState =
   | {
       action: 'none'
     }
   | {
       action: 'moving'
-      data: TActionData
+      data: TMovingActionData
     }
   | {
       action: 'resizing'
-      data: TActionData
+      data: TResizingActionData
     }
 
 /**
@@ -370,29 +421,41 @@ export function CanvasForSelection({
   function handlePointerDown(e: React.PointerEvent) {
     if (actionState.action === 'none') {
       const { clientX, clientY } = e
-      const selectedElemData = getFirstElmDataAtPosition({
-        dataSource: elementsSnapshot,
+      const selected = getFirstElementAtPosition({
+        elementsSnapshot,
         xPosition: clientX,
         yPosition: clientY,
       })
       // a pointer is not click on any elements
-      if (!selectedElemData) return
-
-      // TODO: implement 'inside' when we have filled rectangle
-      // if (selectedElemData.pointerPosition === 'inside') return
+      if (!selected) return
 
       // check which part of the element was clicked
-      if (selectedElemData.pointerPosition === 'onLine') {
-        setActionState({ action: 'moving', data: selectedElemData })
+      if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
+        setActionState({
+          action: 'moving',
+          data: createMovingActionData({
+            movingElement: selected.firstFoundElement,
+            pointerX: clientX,
+            pointerY: clientY,
+          }),
+        })
       } else if (
-        selectedElemData.pointerPosition === 'start' ||
-        selectedElemData.pointerPosition === 'end' ||
-        selectedElemData.pointerPosition === 'tl' ||
-        selectedElemData.pointerPosition === 'tr' ||
-        selectedElemData.pointerPosition === 'br' ||
-        selectedElemData.pointerPosition === 'bl'
+        selected.pointerPosition === 'start' ||
+        selected.pointerPosition === 'end' ||
+        selected.pointerPosition === 'tl' ||
+        selected.pointerPosition === 'tr' ||
+        selected.pointerPosition === 'br' ||
+        selected.pointerPosition === 'bl'
       ) {
-        setActionState({ action: 'resizing', data: selectedElemData })
+        setActionState({
+          action: 'resizing',
+          data: createResizingActionData({
+            resizingElement: selected.firstFoundElement,
+            pointerPosition: selected.pointerPosition,
+          }),
+        })
+      } else {
+        throw new Error(`${selected.pointerPosition} pointer position is not supported`)
       }
       const newElementsSnapshot = [...elementsSnapshot]
       addNewHistory(newElementsSnapshot)
@@ -402,33 +465,32 @@ export function CanvasForSelection({
   const [cursorType, setCursorType] = useState<'default' | 'move' | 'nesw-resize' | 'nwse-resize'>(
     'default'
   )
+  const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
 
   function handlePointerMove(e: React.PointerEvent) {
     const { clientX, clientY } = e
 
     // cursor UI
-    const hoveredElemData = getFirstElmDataAtPosition({
-      dataSource: elementsSnapshot,
+    const hovered = getFirstElementAtPosition({
+      elementsSnapshot: elementsSnapshot,
       xPosition: clientX,
       yPosition: clientY,
     })
-    // TODO: implement 'inside' when we have filled rectangle
-    if (!hoveredElemData) {
+    if (!hovered) {
       setCursorType('default')
-    } else if (hoveredElemData.pointerPosition === 'onLine') {
+    } else if (hovered.pointerPosition === 'onLine' || hovered.pointerPosition === 'inside') {
       setCursorType('move')
-    } else if (
-      hoveredElemData.pointerPosition === 'tr' ||
-      hoveredElemData.pointerPosition === 'bl'
-    ) {
+    } else if (hovered.pointerPosition === 'tr' || hovered.pointerPosition === 'bl') {
       setCursorType('nesw-resize')
     } else if (
-      hoveredElemData.pointerPosition === 'start' ||
-      hoveredElemData.pointerPosition === 'end' ||
-      hoveredElemData.pointerPosition === 'tl' ||
-      hoveredElemData.pointerPosition === 'br'
+      hovered.pointerPosition === 'start' ||
+      hovered.pointerPosition === 'end' ||
+      hovered.pointerPosition === 'tl' ||
+      hovered.pointerPosition === 'br'
     ) {
       setCursorType('nwse-resize')
+    } else {
+      setCursorType('default')
     }
 
     // moving logics
@@ -475,6 +537,16 @@ export function CanvasForSelection({
           type: 'pencil',
           points: newPoints,
         }
+        newElementsSnapshot[index] = newElement
+      } else if (actionState.data.elementType === 'text') {
+        const newElement: TElementData = createTextElement({
+          id: index,
+          canvasForMeasure: canvasForMeasureRef.current,
+          content: actionState.data.content,
+          isWriting: false,
+          x1: clientX - actionState.data.pointerOffsetX1,
+          y1: clientY - actionState.data.pointerOffsetY1,
+        })
         newElementsSnapshot[index] = newElement
       }
 
@@ -581,10 +653,22 @@ export function CanvasForSelection({
     }
   }
 
-  return renderCanvas({
-    onPointerDown: handlePointerDown,
-    onPointerMove: handlePointerMove,
-    onPointerUp: handlePointerUp,
-    styleCursor: cursorType,
-  })
+  return (
+    <>
+      <canvas
+        ref={canvasForMeasureRef}
+        width={1}
+        height={1}
+        style={{ position: 'absolute', top: -20, opacity: 0 }}
+      >
+        For measure text
+      </canvas>
+      {renderCanvas({
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        styleCursor: cursorType,
+      })}
+    </>
+  )
 }
