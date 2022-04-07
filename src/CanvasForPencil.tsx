@@ -40,6 +40,7 @@ export function CanvasForPencil({
   elementsSnapshot,
   addNewHistory,
   replaceCurrentHistory,
+  viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -49,14 +50,21 @@ export function CanvasForPencil({
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void
   replaceCurrentHistory: (arg: TSnapshot) => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+    sceneX: number
+    sceneY: number
+  }
 }) {
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
     if (action === 'none') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       const nextIndex = elementsSnapshot.length
-      const newElement = createPencilElement({ id: nextIndex, newX: clientX, newY: clientY })
+      const newElement = createPencilElement({ id: nextIndex, newX: sceneX, newY: sceneY })
       const newElementsSnapshot = [...elementsSnapshot, newElement]
       addNewHistory(newElementsSnapshot)
       setAction('drawing')
@@ -66,7 +74,10 @@ export function CanvasForPencil({
 
   function handlePointerMove(e: React.PointerEvent) {
     if (action === 'drawing') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
@@ -75,8 +86,8 @@ export function CanvasForPencil({
       }
       const newElement = updatePencilElement({
         id: lastIndex,
-        newX: clientX,
-        newY: clientY,
+        newX: sceneX,
+        newY: sceneY,
         currentPoints: lastElement.points,
       })
       const newElementsSnapshot = [...elementsSnapshot]

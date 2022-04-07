@@ -214,6 +214,10 @@ export function App() {
     return { sceneX: viewportX / zoomLevel, sceneY: viewportY / zoomLevel }
   }
 
+  function sceneCoordsToViewportCoords({ sceneX, sceneY }: { sceneX: number; sceneY: number }) {
+    return { viewportX: sceneX * zoomLevel, viewportY: sceneY * zoomLevel }
+  }
+
   // * --------------------- Rendering -----------------------
   return (
     <div>
@@ -350,6 +354,7 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
           case 'pencil':
@@ -359,6 +364,7 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
           case 'text':
@@ -369,6 +375,8 @@ export function App() {
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
                 undoHistory={undo}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
               />
             )
         }
