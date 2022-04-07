@@ -101,6 +101,8 @@ export function App() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
+  const [zoomLevel, setZoomLevel] = useState(1)
+
   // * ----------- Clear Canvas -------------
 
   function handleClickClear() {
@@ -121,8 +123,13 @@ export function App() {
 
     const dpr = window.devicePixelRatio || 1
     context.save()
-    context.scale(dpr, dpr)
-    context.clearRect(0, 0, canvas.width, canvas.height)
+    context.scale(dpr * zoomLevel, dpr * zoomLevel)
+    context.clearRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
+
+    // for debug
+    // context.strokeStyle = 'red'
+    // context.lineWidth = 5
+    // context.strokeRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
 
     const roughCanvas = rough.canvas(canvas)
     elementsSnapshot.forEach((element) => {
@@ -149,7 +156,8 @@ export function App() {
     context.restore()
   }, [
     elementsSnapshot,
-    // also add tool as dependencies
+    zoomLevel,
+    // ! also add tool as dependencies even though it's not being used inside useLayoutEffect()
     tool,
   ])
 
@@ -194,7 +202,19 @@ export function App() {
       </canvas>
     )
   }
+  // * ---------------------- Others ------------------------
 
+  function viewportCoordsToSceneCoords({
+    viewportX,
+    viewportY,
+  }: {
+    viewportX: number
+    viewportY: number
+  }) {
+    return { sceneX: viewportX / zoomLevel, sceneY: viewportY / zoomLevel }
+  }
+
+  // * --------------------- Rendering -----------------------
   return (
     <div>
       {/* Top Menu */}
@@ -260,7 +280,44 @@ export function App() {
           <button onClick={() => redo()}>Redo</button>
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <button onClick={handleClickClear}>Clear</button>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <button onClick={handleClickClear}>Clear</button>
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <button
+            onClick={() => {
+              setZoomLevel((prev) => {
+                if (prev >= 0.2) {
+                  return prev - 0.1
+                } else {
+                  // min
+                  return 0.1
+                }
+              })
+            }}
+          >
+            Zoom Out
+          </button>
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <button
+            onClick={() => {
+              setZoomLevel(1)
+            }}
+          >
+            100%
+          </button>
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <button
+            onClick={() => {
+              setZoomLevel((prev) => prev + 0.1)
+            }}
+          >
+            Zoom In
+          </button>
+        </span>
       </div>
 
       {/* Canvas */}
@@ -273,6 +330,7 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
           case 'rectangle':
@@ -282,6 +340,7 @@ export function App() {
                 elementsSnapshot={elementsSnapshot}
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
           case 'line':
