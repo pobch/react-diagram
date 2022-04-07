@@ -7,6 +7,7 @@ import { CanvasForLine } from './CanvasForLine'
 import { CanvasForPencil } from './CanvasForPencil'
 import getStroke from 'perfect-freehand'
 import { CanvasForText } from './CanvasForText'
+import { CanvasForHand } from './CanvasForHand'
 
 export type TElementData =
   | {
@@ -94,7 +95,7 @@ function getSvgPathFromStroke(stroke: number[][]) {
 }
 
 export function App() {
-  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text'>(
+  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand'>(
     'selection'
   )
   const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
@@ -102,6 +103,7 @@ export function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const [zoomLevel, setZoomLevel] = useState(1)
+  const [originOffset, setOriginOffset] = useState({ x: 0, y: 0 })
 
   // * ----------- Clear Canvas -------------
 
@@ -123,8 +125,11 @@ export function App() {
 
     const dpr = window.devicePixelRatio || 1
     context.save()
+
+    // scale from the top-left, then translate() to make it seem like zooming from the center
     context.scale(dpr * zoomLevel, dpr * zoomLevel)
     context.clearRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
+    context.translate(originOffset.x, originOffset.y)
 
     // for debug
     // context.strokeStyle = 'red'
@@ -157,6 +162,8 @@ export function App() {
   }, [
     elementsSnapshot,
     zoomLevel,
+    originOffset.x,
+    originOffset.y,
     // ! also add tool as dependencies even though it's not being used inside useLayoutEffect()
     tool,
   ])
@@ -173,7 +180,7 @@ export function App() {
     onPointerMove?: (e: React.PointerEvent) => void
     onPointerUp?: (e: React.PointerEvent) => void
     onClick?: (e: React.MouseEvent) => void
-    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize' | 'text'
+    styleCursor?: 'default' | 'move' | 'nesw-resize' | 'nwse-resize' | 'text' | 'grab' | 'grabbing'
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
@@ -211,11 +218,60 @@ export function App() {
     viewportX: number
     viewportY: number
   }) {
-    return { sceneX: viewportX / zoomLevel, sceneY: viewportY / zoomLevel }
+    return {
+      sceneX: viewportX / zoomLevel - originOffset.x,
+      sceneY: viewportY / zoomLevel - originOffset.y,
+    }
   }
 
   function sceneCoordsToViewportCoords({ sceneX, sceneY }: { sceneX: number; sceneY: number }) {
-    return { viewportX: sceneX * zoomLevel, viewportY: sceneY * zoomLevel }
+    return {
+      viewportX: (sceneX + originOffset.x) * zoomLevel,
+      viewportY: (sceneY + originOffset.y) * zoomLevel,
+    }
+  }
+
+  function zoomIn() {
+    if (!canvasRef.current) return
+
+    const dpr = window.devicePixelRatio
+    const nextZoom = zoomLevel + 0.1
+    setZoomLevel(nextZoom)
+    // offset (0, 0) to the same point as zoomLevel === 1
+    setOriginOffset({
+      x:
+        originOffset.x -
+        (canvasRef.current.width / zoomLevel - canvasRef.current.width) / (2 * dpr) +
+        (canvasRef.current.width / nextZoom - canvasRef.current.width) / (2 * dpr),
+      y:
+        originOffset.y -
+        (canvasRef.current.height / zoomLevel - canvasRef.current.height) / (2 * dpr) +
+        (canvasRef.current.height / nextZoom - canvasRef.current.height) / (2 * dpr),
+    })
+  }
+
+  function zoomOut() {
+    if (!canvasRef.current) return
+
+    const dpr = window.devicePixelRatio
+    const nextZoom = Math.max(zoomLevel - 0.1, 0.1)
+    setZoomLevel(nextZoom)
+    // offset (0, 0) to the same point as zoomLevel === 1
+    setOriginOffset({
+      x:
+        originOffset.x -
+        (canvasRef.current!.width / zoomLevel - canvasRef.current!.width) / (2 * dpr) +
+        (canvasRef.current!.width / nextZoom - canvasRef.current!.width) / (2 * dpr),
+      y:
+        originOffset.y -
+        (canvasRef.current!.height / zoomLevel - canvasRef.current!.height) / (2 * dpr) +
+        (canvasRef.current!.height / nextZoom - canvasRef.current!.height) / (2 * dpr),
+    })
+  }
+
+  function resetZoom() {
+    setZoomLevel(1)
+    setOriginOffset({ x: 0, y: 0 })
   }
 
   // * --------------------- Rendering -----------------------
@@ -274,6 +330,16 @@ export function App() {
           />
           <label htmlFor="text">Text</label>
         </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="hand"
+            checked={tool === 'hand'}
+            onChange={() => setTool('hand')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="hand">Hand</label>
+        </span>
       </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
@@ -289,38 +355,13 @@ export function App() {
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button
-            onClick={() => {
-              setZoomLevel((prev) => {
-                if (prev >= 0.2) {
-                  return prev - 0.1
-                } else {
-                  // min
-                  return 0.1
-                }
-              })
-            }}
-          >
-            Zoom Out
-          </button>
+          <button onClick={zoomOut}>Zoom Out</button>
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button
-            onClick={() => {
-              setZoomLevel(1)
-            }}
-          >
-            100%
-          </button>
+          <button onClick={resetZoom}>Reset</button>
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button
-            onClick={() => {
-              setZoomLevel((prev) => prev + 0.1)
-            }}
-          >
-            Zoom In
-          </button>
+          <button onClick={zoomIn}>Zoom In</button>
         </span>
       </div>
 
@@ -377,6 +418,14 @@ export function App() {
                 undoHistory={undo}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
+              />
+            )
+          case 'hand':
+            return (
+              <CanvasForHand
+                renderCanvas={renderCanvas}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                setOriginOffset={setOriginOffset}
               />
             )
         }
