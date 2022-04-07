@@ -1,6 +1,6 @@
 # Diagram Drawing App
 
-A diagram drawing application demonstrating how we can utilize `React` and HTML `<canvas/>` to create an interactive drawing application.
+A diagram drawing application demonstrating how we can utilize `React` and HTML `<canvas/>` to create an interactive drawing.
 
 ## Demo
 
@@ -8,7 +8,7 @@ https://react-diagram.netlify.app/
 
 ## Features
 
-https://user-images.githubusercontent.com/19894957/161531226-908ee3ea-6b3c-4b3c-bd78-f74cc399f0f6.mp4
+https://user-images.githubusercontent.com/19894957/162326488-acb9a380-8727-4ae5-89ba-4370aa513582.mp4
 
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
@@ -20,8 +20,8 @@ https://user-images.githubusercontent.com/19894957/161531226-908ee3ea-6b3c-4b3c-
 - [ ] Arrow drawing tool
   - https://stackoverflow.com/a/26806316
   - https://codesandbox.io/s/magical-feynman-mtuziv?file=/src/index.js
-- [ ] Pan feature
-- [ ] Zoom feature
+- [x] Pan feature
+- [x] Zoom feature
 - [ ] Support uploading an image
 - [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
