@@ -52,6 +52,7 @@ export function CanvasForRect({
   elementsSnapshot,
   addNewHistory,
   replaceCurrentHistory,
+  viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -61,17 +62,24 @@ export function CanvasForRect({
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void
   replaceCurrentHistory: (arg: TSnapshot) => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+    sceneX: number
+    sceneY: number
+  }
 }) {
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
     if (action === 'none') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       const nextIndex = elementsSnapshot.length
       const newElement = createRectangleElement({
         id: nextIndex,
-        x1: clientX,
-        y1: clientY,
+        x1: sceneX,
+        y1: sceneY,
         width: 0,
         height: 0,
       })
@@ -84,7 +92,10 @@ export function CanvasForRect({
 
   function handlePointerMove(e: React.PointerEvent) {
     if (action === 'drawing') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
@@ -96,8 +107,8 @@ export function CanvasForRect({
         id: lastIndex,
         x1: currentX1,
         y1: currentY1,
-        width: clientX - currentX1,
-        height: clientY - currentY1,
+        width: sceneX - currentX1,
+        height: sceneY - currentY1,
       })
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[lastIndex] = newElement

@@ -83,6 +83,8 @@ export function CanvasForText({
   addNewHistory,
   replaceCurrentHistory,
   undoHistory,
+  viewportCoordsToSceneCoords,
+  sceneCoordsToViewportCoords,
 }: {
   renderCanvas: (arg: {
     onPointerMove: (e: React.PointerEvent) => void
@@ -93,6 +95,14 @@ export function CanvasForText({
   addNewHistory: (arg: TSnapshot) => void
   replaceCurrentHistory: (arg: TSnapshot) => void
   undoHistory: () => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+    sceneX: number
+    sceneY: number
+  }
+  sceneCoordsToViewportCoords: (arg: { sceneX: number; sceneY: number }) => {
+    viewportX: number
+    viewportY: number
+  }
 }) {
   const [actionState, setActionState] = useState<
     | { action: 'none' }
@@ -127,10 +137,14 @@ export function CanvasForText({
       return
     }
 
+    const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+      viewportX: e.clientX,
+      viewportY: e.clientY,
+    })
     const firstFoundElement = getTextElementAtPosition({
       elementsSnapshot,
-      xPosition: e.clientX,
-      yPosition: e.clientY,
+      xPosition: sceneX,
+      yPosition: sceneY,
     })
     if (firstFoundElement) {
       setCursorType('text')
@@ -147,12 +161,15 @@ export function CanvasForText({
   function handleClick(e: React.MouseEvent) {
     // no textarea being displayed, will go to either creating or updating mode
     if (actionState.action === 'none') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
 
       const firstFoundElement = getTextElementAtPosition({
         elementsSnapshot,
-        xPosition: clientX,
-        yPosition: clientY,
+        xPosition: sceneX,
+        yPosition: sceneY,
       })
       // found an existing text element, go to updating mode
       if (firstFoundElement && firstFoundElement.type === 'text') {
@@ -188,7 +205,7 @@ export function CanvasForText({
       else if (!firstFoundElement) {
         setActionState({
           action: 'creating',
-          data: { textareaX1: clientX, textareaY1: clientY, textareaWidth: 0, textareaHeight: 0 },
+          data: { textareaX1: sceneX, textareaY1: sceneY, textareaWidth: 0, textareaHeight: 0 },
         })
         const nextIndex = elementsSnapshot.length
         const newElement: TElementData = {
@@ -289,13 +306,22 @@ export function CanvasForText({
           style={{
             display: 'block',
             position: 'fixed',
-            top: actionState.data.textareaY1,
-            left: actionState.data.textareaX1,
+            top: sceneCoordsToViewportCoords({
+              sceneX: actionState.data.textareaX1,
+              sceneY: actionState.data.textareaY1,
+            }).viewportY,
+            left: sceneCoordsToViewportCoords({
+              sceneX: actionState.data.textareaX1,
+              sceneY: actionState.data.textareaY1,
+            }).viewportX,
+            // TODO: convert sceneHeight -> viewportHeight
             height: actionState.data.textareaHeight,
             minHeight: '2rem',
+            // TODO: convert sceneWidth -> viewportWidth
             width: actionState.data.textareaWidth,
             minWidth: '2rem',
             fontFamily: 'Nanum Pen Script',
+            // TODO: scale fontSize based on zoomLevel
             fontSize: '1.5rem',
             // TODO: fix this magic number
             lineHeight: 0.8,
@@ -330,13 +356,22 @@ export function CanvasForText({
           style={{
             display: 'block',
             position: 'fixed',
-            top: actionState.data.textareaY1,
-            left: actionState.data.textareaX1,
+            top: sceneCoordsToViewportCoords({
+              sceneX: actionState.data.textareaX1,
+              sceneY: actionState.data.textareaY1,
+            }).viewportY,
+            left: sceneCoordsToViewportCoords({
+              sceneX: actionState.data.textareaX1,
+              sceneY: actionState.data.textareaY1,
+            }).viewportX,
+            // TODO: convert sceneHeight -> viewportHeight
             height: actionState.data.textareaHeight,
             minHeight: '2rem',
+            // TODO: convert sceneWidth -> viewportWidth
             width: actionState.data.textareaWidth,
             minWidth: '2rem',
             fontFamily: 'Nanum Pen Script',
+            // TODO: scale fontSize based on zoomLevel
             fontSize: '1.5rem',
             // TODO: fix this magic number
             lineHeight: 0.8,

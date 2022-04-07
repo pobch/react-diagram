@@ -32,6 +32,7 @@ export function CanvasForLine({
   elementsSnapshot,
   addNewHistory,
   replaceCurrentHistory,
+  viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -41,19 +42,26 @@ export function CanvasForLine({
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void
   replaceCurrentHistory: (arg: TSnapshot) => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+    sceneX: number
+    sceneY: number
+  }
 }) {
   const [action, setAction] = useState<'none' | 'drawing'>('none')
 
   function handlePointerDown(e: React.PointerEvent) {
     if (action === 'none') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       const nextIndex = elementsSnapshot.length
       const newElement = createLineElement({
         id: nextIndex,
-        x1: clientX,
-        y1: clientY,
-        x2: clientX,
-        y2: clientY,
+        x1: sceneX,
+        y1: sceneY,
+        x2: sceneX,
+        y2: sceneY,
       })
       const newElementsSnapshot = [...elementsSnapshot, newElement]
       addNewHistory(newElementsSnapshot)
@@ -64,7 +72,10 @@ export function CanvasForLine({
 
   function handlePointerMove(e: React.PointerEvent) {
     if (action === 'drawing') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
@@ -76,8 +87,8 @@ export function CanvasForLine({
         id: lastIndex,
         x1: currentX1,
         y1: currentY1,
-        x2: clientX,
-        y2: clientY,
+        x2: sceneX,
+        y2: sceneY,
       })
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[lastIndex] = newElement

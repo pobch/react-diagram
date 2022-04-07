@@ -405,6 +405,7 @@ export function CanvasForSelection({
   elementsSnapshot,
   addNewHistory,
   replaceCurrentHistory,
+  viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -415,16 +416,23 @@ export function CanvasForSelection({
   elementsSnapshot: TSnapshot
   addNewHistory: (arg: TSnapshot) => void
   replaceCurrentHistory: (arg: TSnapshot) => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+    sceneX: number
+    sceneY: number
+  }
 }) {
   const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
     if (actionState.action === 'none') {
-      const { clientX, clientY } = e
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
       const selected = getFirstElementAtPosition({
         elementsSnapshot,
-        xPosition: clientX,
-        yPosition: clientY,
+        xPosition: sceneX,
+        yPosition: sceneY,
       })
       // a pointer is not click on any elements
       if (!selected) return
@@ -435,8 +443,8 @@ export function CanvasForSelection({
           action: 'moving',
           data: createMovingActionData({
             movingElement: selected.firstFoundElement,
-            pointerX: clientX,
-            pointerY: clientY,
+            pointerX: sceneX,
+            pointerY: sceneY,
           }),
         })
       } else if (
@@ -468,13 +476,16 @@ export function CanvasForSelection({
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
 
   function handlePointerMove(e: React.PointerEvent) {
-    const { clientX, clientY } = e
+    const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+      viewportX: e.clientX,
+      viewportY: e.clientY,
+    })
 
     // cursor UI
     const hovered = getFirstElementAtPosition({
       elementsSnapshot: elementsSnapshot,
-      xPosition: clientX,
-      yPosition: clientY,
+      xPosition: sceneX,
+      yPosition: sceneY,
     })
     if (!hovered) {
       setCursorType('default')
@@ -500,8 +511,8 @@ export function CanvasForSelection({
       const newElementsSnapshot = [...elementsSnapshot]
 
       if (actionState.data.elementType === 'line') {
-        const newX1 = clientX - actionState.data.pointerOffsetX1
-        const newY1 = clientY - actionState.data.pointerOffsetY1
+        const newX1 = sceneX - actionState.data.pointerOffsetX1
+        const newY1 = sceneY - actionState.data.pointerOffsetY1
         // keep existing line width
         const distanceX = actionState.data.x2 - actionState.data.x1
         const distanceY = actionState.data.y2 - actionState.data.y1
@@ -514,8 +525,8 @@ export function CanvasForSelection({
         })
         newElementsSnapshot[index] = newElement
       } else if (actionState.data.elementType === 'rectangle') {
-        const newX1 = clientX - actionState.data.pointerOffsetX1
-        const newY1 = clientY - actionState.data.pointerOffsetY1
+        const newX1 = sceneX - actionState.data.pointerOffsetX1
+        const newY1 = sceneY - actionState.data.pointerOffsetY1
         // keep existing width + height
         const width = actionState.data.x2 - actionState.data.x1
         const height = actionState.data.y2 - actionState.data.y1
@@ -529,8 +540,8 @@ export function CanvasForSelection({
         newElementsSnapshot[index] = newElement
       } else if (actionState.data.elementType === 'pencil') {
         const newPoints = actionState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
-          x: clientX - offsetX,
-          y: clientY - offsetY,
+          x: sceneX - offsetX,
+          y: sceneY - offsetY,
         }))
         const newElement: TElementData = {
           id: index,
@@ -544,8 +555,8 @@ export function CanvasForSelection({
           canvasForMeasure: canvasForMeasureRef.current,
           content: actionState.data.content,
           isWriting: false,
-          x1: clientX - actionState.data.pointerOffsetX1,
-          y1: clientY - actionState.data.pointerOffsetY1,
+          x1: sceneX - actionState.data.pointerOffsetX1,
+          y1: sceneY - actionState.data.pointerOffsetY1,
         })
         newElementsSnapshot[index] = newElement
       }
@@ -564,8 +575,8 @@ export function CanvasForSelection({
         if (actionState.data.pointerPosition === 'start') {
           const newElement = createLineElement({
             id: index,
-            x1: clientX,
-            y1: clientY,
+            x1: sceneX,
+            y1: sceneY,
             x2: actionState.data.x2,
             y2: actionState.data.y2,
           })
@@ -575,8 +586,8 @@ export function CanvasForSelection({
             id: index,
             x1: actionState.data.x1,
             y1: actionState.data.y1,
-            x2: clientX,
-            y2: clientY,
+            x2: sceneX,
+            y2: sceneY,
           })
           newElementsSnapshot[index] = newElement
         }
@@ -584,19 +595,19 @@ export function CanvasForSelection({
         if (actionState.data.pointerPosition === 'tl') {
           const newElement = createRectangleElement({
             id: index,
-            x1: clientX,
-            y1: clientY,
-            width: actionState.data.x2 - clientX,
-            height: actionState.data.y2 - clientY,
+            x1: sceneX,
+            y1: sceneY,
+            width: actionState.data.x2 - sceneX,
+            height: actionState.data.y2 - sceneY,
           })
           newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'tr') {
           const newElement = createRectangleElement({
             id: index,
             x1: actionState.data.x1,
-            y1: clientY,
-            width: clientX - actionState.data.x1,
-            height: actionState.data.y2 - clientY,
+            y1: sceneY,
+            width: sceneX - actionState.data.x1,
+            height: actionState.data.y2 - sceneY,
           })
           newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'br') {
@@ -604,17 +615,17 @@ export function CanvasForSelection({
             id: index,
             x1: actionState.data.x1,
             y1: actionState.data.y1,
-            width: clientX - actionState.data.x1,
-            height: clientY - actionState.data.y1,
+            width: sceneX - actionState.data.x1,
+            height: sceneY - actionState.data.y1,
           })
           newElementsSnapshot[index] = newElement
         } else if (actionState.data.pointerPosition === 'bl') {
           const newElement = createRectangleElement({
             id: index,
-            x1: clientX,
+            x1: sceneX,
             y1: actionState.data.y1,
-            width: actionState.data.x2 - clientX,
-            height: clientY - actionState.data.y1,
+            width: actionState.data.x2 - sceneX,
+            height: sceneY - actionState.data.y1,
           })
           newElementsSnapshot[index] = newElement
         }
