@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { Drawable } from 'roughjs/bin/core'
 import rough from 'roughjs/bundled/rough.esm'
 import { CanvasForSelection } from './CanvasForSelection'
@@ -115,55 +115,76 @@ export function App() {
 
   // * ------------ Canvas Drawing ------------
 
-  useLayoutEffect(() => {
-    if (!canvasRef.current) return
+  const drawScene = useCallback(
+    (extra?: {
+      elements: TElementData[]
+      drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
+    }) => {
+      if (!canvasRef.current) return
 
-    const canvas = canvasRef.current
-    const context = canvas.getContext('2d')
+      const canvas = canvasRef.current
+      const context = canvas.getContext('2d')
 
-    if (!context) return
+      if (!context) return
 
-    const dpr = window.devicePixelRatio || 1
-    context.save()
+      const dpr = window.devicePixelRatio || 1
+      context.save()
 
-    // scale from the top-left, then translate() to make it seem like zooming from the center
-    context.scale(dpr * zoomLevel, dpr * zoomLevel)
-    context.clearRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
-    context.translate(originOffset.x, originOffset.y)
+      // scale from the top-left, then translate() to make it seem like zooming from the center
+      context.scale(dpr * zoomLevel, dpr * zoomLevel)
+      context.clearRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
+      context.translate(originOffset.x, originOffset.y)
 
-    // for debug
-    // context.strokeStyle = 'red'
-    // context.lineWidth = 5
-    // context.strokeRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
+      // for debug
+      // context.strokeStyle = 'red'
+      // context.lineWidth = 5
+      // context.strokeRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
 
-    const roughCanvas = rough.canvas(canvas)
-    elementsSnapshot.forEach((element) => {
-      if (element.type === 'line' || element.type === 'rectangle') {
-        roughCanvas.draw(element.roughElement)
-      } else if (element.type === 'pencil') {
-        const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
-        // context.fillStyle = 'red'
-        context.fill(new Path2D(stroke))
-      } else if (element.type === 'text' && !element.isWriting) {
-        context.textBaseline = 'top'
-        context.font = '1.5rem "Nanum Pen Script"'
-        for (let i = 0; i < element.lines.length; i++) {
-          context.fillText(
-            element.lines[i].lineContent,
-            element.lines[i].lineX1,
-            element.lines[i].lineY1
-          )
+      const roughCanvas = rough.canvas(canvas)
+      elementsSnapshot.forEach((element) => {
+        if (element.type === 'line' || element.type === 'rectangle') {
+          roughCanvas.draw(element.roughElement)
+        } else if (element.type === 'pencil') {
+          const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
+          // context.fillStyle = 'red'
+          context.fill(new Path2D(stroke))
+        } else if (element.type === 'text' && !element.isWriting) {
+          context.textBaseline = 'top'
+          context.font = '1.5rem "Nanum Pen Script"'
+          for (let i = 0; i < element.lines.length; i++) {
+            context.fillText(
+              element.lines[i].lineContent,
+              element.lines[i].lineX1,
+              element.lines[i].lineY1
+            )
+          }
+        } else if (element.type === 'removed') {
+          // don't draw
         }
-      } else if (element.type === 'removed') {
-        // don't draw
+      })
+
+      // Check if there are additional elements we want to draw, e.g. dashed selection
+      if (extra) {
+        extra.elements.forEach((element) => {
+          extra.drawFn(element, canvas)
+        })
       }
-    })
-    context.restore()
+
+      context.restore()
+    },
+    [elementsSnapshot, originOffset.x, originOffset.y, zoomLevel]
+  )
+
+  useLayoutEffect(() => {
+    // In case of a selection tool, we need to delegate the whole canvas drawing to the child component
+    // ... because there are additional elements we want to draw which are in the child's state
+    if (tool === 'selection') {
+      return
+    }
+
+    drawScene()
   }, [
-    elementsSnapshot,
-    zoomLevel,
-    originOffset.x,
-    originOffset.y,
+    drawScene,
     // ! also add tool as dependencies even though it's not being used inside useLayoutEffect()
     tool,
   ])
@@ -376,6 +397,7 @@ export function App() {
                 addNewHistory={addNewHistory}
                 replaceCurrentHistory={replaceCurrentHistory}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                drawScene={drawScene}
               />
             )
           case 'rectangle':

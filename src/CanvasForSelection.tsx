@@ -1,9 +1,10 @@
+import { useState, useRef, useLayoutEffect } from 'react'
 import * as React from 'react'
-import { useState, useRef } from 'react'
 import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
 import { TElementData, TSnapshot } from './App'
 import { createTextElement, getTextElementAtPosition } from './CanvasForText'
+import rough from 'roughjs/bundled/rough.esm'
 
 function getFirstElementAtPosition({
   elementsSnapshot,
@@ -394,6 +395,12 @@ type TActionState =
       action: 'resizing'
       data: TResizingActionData
     }
+  | {
+      action: 'selecting'
+      data: {
+        elementId: number
+      }
+    }
 
 /**
  * * -----------------------------------------
@@ -406,6 +413,7 @@ export function CanvasForSelection({
   addNewHistory,
   replaceCurrentHistory,
   viewportCoordsToSceneCoords,
+  drawScene,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -420,8 +428,108 @@ export function CanvasForSelection({
     sceneX: number
     sceneY: number
   }
+  drawScene: (extra?: {
+    elements: TElementData[]
+    drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
+  }) => void
 }) {
   const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
+
+  // useLayoutEffect() in the parent will be ignored in case of a selection tool.
+  // ... Therefore, all canvas drawing logics need to be here instead.
+  useLayoutEffect(() => {
+    if (
+      actionState.action === 'moving' ||
+      actionState.action === 'resizing' ||
+      actionState.action === 'selecting'
+    ) {
+      // draw dashed selection as an extra
+      drawScene({
+        elements: [elementsSnapshot[actionState.data.elementId]],
+        drawFn: (element, canvas) => {
+          if (element.type === 'rectangle') {
+            const roughCanvas = rough.canvas(canvas)
+            const dashOffset = 5
+            const dashTopLeft = {
+              x: element.x1 - dashOffset,
+              y: element.y1 - dashOffset,
+            }
+            const dashBottomRight = {
+              x: element.x2 + dashOffset,
+              y: element.y2 + dashOffset,
+            }
+
+            roughCanvas.rectangle(
+              dashTopLeft.x,
+              dashTopLeft.y,
+              dashBottomRight.x - dashTopLeft.x,
+              dashBottomRight.y - dashTopLeft.y,
+              {
+                strokeLineDash: [5, 5],
+              }
+            )
+            roughCanvas.rectangle(dashTopLeft.x, dashTopLeft.y, dashOffset * 2, dashOffset * 2)
+            roughCanvas.rectangle(
+              dashTopLeft.x,
+              dashBottomRight.y - dashOffset * 2,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              dashBottomRight.x - dashOffset * 2,
+              dashBottomRight.y - dashOffset * 2,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              dashBottomRight.x - dashOffset * 2,
+              dashTopLeft.y,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+          } else if (element.type === 'line') {
+            const roughCanvas = rough.canvas(canvas)
+            const dashOffset = 5
+
+            // TODO: find better math equation
+            roughCanvas.line(
+              element.x1,
+              element.y1 - dashOffset,
+              element.x2,
+              element.y2 - dashOffset,
+              { strokeLineDash: [5, 5] }
+            )
+            roughCanvas.line(
+              element.x1,
+              element.y1 + dashOffset,
+              element.x2,
+              element.y2 + dashOffset,
+              { strokeLineDash: [5, 5] }
+            )
+            roughCanvas.rectangle(
+              element.x1,
+              element.y1 - dashOffset,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              element.x2,
+              element.y2 - dashOffset,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+          } else if (element.type === 'pencil') {
+          } else if (element.type === 'text') {
+          }
+        },
+      })
+      return
+    }
+
+    // no extra dashed selection being drawn
+    drawScene()
+    return
+  }, [actionState, drawScene, elementsSnapshot])
 
   function handlePointerDown(e: React.PointerEvent) {
     if (actionState.action === 'none') {
@@ -437,7 +545,38 @@ export function CanvasForSelection({
       // a pointer is not click on any elements
       if (!selected) return
 
-      // check which part of the element was clicked
+      // when current action is "none", we only allow to move an element
+      setActionState({
+        action: 'moving',
+        data: createMovingActionData({
+          movingElement: selected.firstFoundElement,
+          pointerX: sceneX,
+          pointerY: sceneY,
+        }),
+      })
+      const newElementsSnapshot = [...elementsSnapshot]
+      addNewHistory(newElementsSnapshot)
+      return
+    } else if (actionState.action === 'selecting') {
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
+      const selected = getFirstElementAtPosition({
+        elementsSnapshot,
+        xPosition: sceneX,
+        yPosition: sceneY,
+      })
+      // a pointer is not click on any elements
+      if (!selected) {
+        setActionState({
+          action: 'none',
+        })
+        return
+      }
+
+      // when the current action is "selecting", we allow to either move or resize an element
+      // ... so, we need to check which part of the element was clicked
       if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
         setActionState({
           action: 'moving',
@@ -467,6 +606,7 @@ export function CanvasForSelection({
       }
       const newElementsSnapshot = [...elementsSnapshot]
       addNewHistory(newElementsSnapshot)
+      return
     }
   }
 
@@ -653,13 +793,13 @@ export function CanvasForSelection({
       })
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[selectedIndex] = newElement
-
       replaceCurrentHistory(newElementsSnapshot)
     }
 
-    // clear action
+    // Go to "selecting" state after moving/resizing.
+    // onPointerDown() then allow "selecting" -> "none" state
     if (actionState.action === 'moving' || actionState.action === 'resizing') {
-      setActionState({ action: 'none' })
+      setActionState({ action: 'selecting', data: { elementId: actionState.data.elementId } })
       return
     }
   }
