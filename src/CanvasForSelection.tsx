@@ -1,9 +1,11 @@
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
-import { useState, useRef } from 'react'
 import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
-import { TElementData, TSnapshot } from './App'
+import { getSvgPathFromStroke, TElementData, TSnapshot } from './App'
 import { createTextElement, getTextElementAtPosition } from './CanvasForText'
+import rough from 'roughjs/bundled/rough.esm'
+import getStroke from 'perfect-freehand'
 
 function getFirstElementAtPosition({
   elementsSnapshot,
@@ -394,6 +396,12 @@ type TActionState =
       action: 'resizing'
       data: TResizingActionData
     }
+  | {
+      action: 'selecting'
+      data: {
+        elementId: number
+      }
+    }
 
 /**
  * * -----------------------------------------
@@ -406,6 +414,7 @@ export function CanvasForSelection({
   addNewHistory,
   replaceCurrentHistory,
   viewportCoordsToSceneCoords,
+  drawScene,
 }: {
   renderCanvas: (arg: {
     onPointerDown: (e: React.PointerEvent) => void
@@ -420,8 +429,164 @@ export function CanvasForSelection({
     sceneX: number
     sceneY: number
   }
+  drawScene: (extra?: {
+    elements: TElementData[]
+    drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
+  }) => void
 }) {
   const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
+
+  // useLayoutEffect() in the parent will be ignored in case of a selection tool.
+  // ... Therefore, all canvas drawing logics need to be here instead.
+  useLayoutEffect(() => {
+    if (
+      actionState.action === 'moving' ||
+      actionState.action === 'resizing' ||
+      actionState.action === 'selecting'
+    ) {
+      // Typescript won't automatically check for `undefined` possibility
+      // ... which can be happened from acessing an non-existing array's index.
+      // Therefore, we need to add `undefined` type ourself or enable `noUncheckedIndexedAccess` rule.
+      const selectingElement: TSnapshot[number] | undefined =
+        elementsSnapshot[actionState.data.elementId]
+      // draw dashed selection around all selecting elements as an extra
+      drawScene({
+        elements: selectingElement ? Array.of(selectingElement) : [],
+        drawFn: (element, canvas) => {
+          if (element.type === 'rectangle') {
+            const roughCanvas = rough.canvas(canvas)
+            const dashOffset = 5
+            const dashTopLeft = {
+              x: element.x1 - dashOffset,
+              y: element.y1 - dashOffset,
+            }
+            const dashBottomRight = {
+              x: element.x2 + dashOffset,
+              y: element.y2 + dashOffset,
+            }
+
+            roughCanvas.rectangle(
+              dashTopLeft.x,
+              dashTopLeft.y,
+              dashBottomRight.x - dashTopLeft.x,
+              dashBottomRight.y - dashTopLeft.y,
+              {
+                strokeLineDash: [5, 5],
+              }
+            )
+            roughCanvas.rectangle(dashTopLeft.x, dashTopLeft.y, dashOffset * 2, dashOffset * 2)
+            roughCanvas.rectangle(
+              dashTopLeft.x,
+              dashBottomRight.y - dashOffset * 2,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              dashBottomRight.x - dashOffset * 2,
+              dashBottomRight.y - dashOffset * 2,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              dashBottomRight.x - dashOffset * 2,
+              dashTopLeft.y,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            return
+          } else if (element.type === 'line') {
+            const roughCanvas = rough.canvas(canvas)
+            const dashOffset = 5
+
+            // TODO: find better math equation
+            roughCanvas.line(
+              element.x1,
+              element.y1 - dashOffset,
+              element.x2,
+              element.y2 - dashOffset,
+              { strokeLineDash: [5, 5] }
+            )
+            roughCanvas.line(
+              element.x1,
+              element.y1 + dashOffset,
+              element.x2,
+              element.y2 + dashOffset,
+              { strokeLineDash: [5, 5] }
+            )
+            roughCanvas.rectangle(
+              element.x1,
+              element.y1 - dashOffset,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            roughCanvas.rectangle(
+              element.x2,
+              element.y2 - dashOffset,
+              dashOffset * 2,
+              dashOffset * 2
+            )
+            return
+          } else if (element.type === 'pencil') {
+            const context = canvas.getContext('2d')
+            if (!context) return
+
+            context.save()
+            const stroke = getSvgPathFromStroke(
+              getStroke(element.points, { size: 14, end: { cap: false }, start: { cap: false } })
+            )
+            context.setLineDash([5, 5])
+            context.stroke(new Path2D(stroke))
+            context.restore()
+            return
+          } else if (element.type === 'text') {
+            const context = canvas.getContext('2d')
+            if (!context) return
+
+            context.save()
+            context.setLineDash([5, 5])
+
+            // TODO: find a way to offset the dashed selection
+            for (let i = 0; i < element.lines.length; i++) {
+              context.strokeRect(
+                element.lines[i].lineX1,
+                element.lines[i].lineY1,
+                element.lines[i].lineWidth,
+                element.lines[i].lineHeight
+              )
+            }
+            context.restore()
+            return
+          }
+        },
+      })
+      return
+    }
+
+    // no extra dashed selection being drawn
+    drawScene()
+    return
+  }, [actionState, drawScene, elementsSnapshot])
+
+  // ?? Is there any better approach
+  // Reset actionState when it is holding an element's id that is not being drawn in the canvas.
+  // Example case#1:
+  // 1. Click to select the latest created element (the element id is recorded in actionState)
+  // 2. Click undo until the selecting element disappear (at this state, the snapshot revert
+  //    to the point that does not have this element at all, but actionState is still holding the element id)
+  // Case#2:
+  // 1. Click to select any element
+  // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
+  //    but actionState still holding its id)
+  useEffect(() => {
+    if (actionState.action !== 'none') {
+      if (
+        !elementsSnapshot[actionState.data.elementId] ||
+        elementsSnapshot[actionState.data.elementId].type === 'removed'
+      ) {
+        setActionState({ action: 'none' })
+      }
+    }
+  }, [actionState, elementsSnapshot])
 
   function handlePointerDown(e: React.PointerEvent) {
     if (actionState.action === 'none') {
@@ -437,7 +602,38 @@ export function CanvasForSelection({
       // a pointer is not click on any elements
       if (!selected) return
 
-      // check which part of the element was clicked
+      // when current action is "none", we only allow to move an element
+      setActionState({
+        action: 'moving',
+        data: createMovingActionData({
+          movingElement: selected.firstFoundElement,
+          pointerX: sceneX,
+          pointerY: sceneY,
+        }),
+      })
+      const newElementsSnapshot = [...elementsSnapshot]
+      addNewHistory(newElementsSnapshot)
+      return
+    } else if (actionState.action === 'selecting') {
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
+      const selected = getFirstElementAtPosition({
+        elementsSnapshot,
+        xPosition: sceneX,
+        yPosition: sceneY,
+      })
+      // a pointer is not click on any elements
+      if (!selected) {
+        setActionState({
+          action: 'none',
+        })
+        return
+      }
+
+      // when the current action is "selecting", we allow to either move or resize an element
+      // ... so, we need to check which part of the element was clicked
       if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
         setActionState({
           action: 'moving',
@@ -467,6 +663,7 @@ export function CanvasForSelection({
       }
       const newElementsSnapshot = [...elementsSnapshot]
       addNewHistory(newElementsSnapshot)
+      return
     }
   }
 
@@ -653,13 +850,25 @@ export function CanvasForSelection({
       })
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[selectedIndex] = newElement
-
       replaceCurrentHistory(newElementsSnapshot)
     }
 
-    // clear action
+    // Go to "selecting" state after moving/resizing.
+    // onPointerDown() then allow "selecting" -> "none" state
     if (actionState.action === 'moving' || actionState.action === 'resizing') {
-      setActionState({ action: 'none' })
+      setActionState({ action: 'selecting', data: { elementId: actionState.data.elementId } })
+      return
+    }
+  }
+
+  function handleClickDeleteElement() {
+    if (actionState.action === 'selecting') {
+      const newElementsSnapshot = [...elementsSnapshot]
+      newElementsSnapshot[actionState.data.elementId] = {
+        type: 'removed',
+        id: actionState.data.elementId,
+      }
+      addNewHistory(newElementsSnapshot)
       return
     }
   }
@@ -675,6 +884,13 @@ export function CanvasForSelection({
       >
         For measure text
       </canvas>
+
+      {/* floating delete button at top-left of the screen */}
+      {actionState.action === 'selecting' ? (
+        <div style={{ position: 'fixed', top: '1.5rem', left: '0.5rem' }}>
+          <button onClick={handleClickDeleteElement}>X</button>
+        </div>
+      ) : null}
 
       {renderCanvas({
         onPointerDown: handlePointerDown,
