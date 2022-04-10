@@ -78,7 +78,7 @@ function useHistory() {
 }
 
 // copy from perfect-freehand doc
-function getSvgPathFromStroke(stroke: number[][]) {
+export function getSvgPathFromStroke(stroke: number[][]) {
   if (!stroke.length) return ''
 
   const d = stroke.reduce(

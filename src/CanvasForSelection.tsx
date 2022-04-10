@@ -2,9 +2,10 @@ import { useState, useRef, useLayoutEffect } from 'react'
 import * as React from 'react'
 import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
-import { TElementData, TSnapshot } from './App'
+import { getSvgPathFromStroke, TElementData, TSnapshot } from './App'
 import { createTextElement, getTextElementAtPosition } from './CanvasForText'
 import rough from 'roughjs/bundled/rough.esm'
+import getStroke from 'perfect-freehand'
 
 function getFirstElementAtPosition({
   elementsSnapshot,
@@ -487,6 +488,7 @@ export function CanvasForSelection({
               dashOffset * 2,
               dashOffset * 2
             )
+            return
           } else if (element.type === 'line') {
             const roughCanvas = rough.canvas(canvas)
             const dashOffset = 5
@@ -518,8 +520,37 @@ export function CanvasForSelection({
               dashOffset * 2,
               dashOffset * 2
             )
+            return
           } else if (element.type === 'pencil') {
+            const context = canvas.getContext('2d')
+            if (!context) return
+
+            context.save()
+            const stroke = getSvgPathFromStroke(
+              getStroke(element.points, { size: 14, end: { cap: false }, start: { cap: false } })
+            )
+            context.setLineDash([5, 5])
+            context.stroke(new Path2D(stroke))
+            context.restore()
+            return
           } else if (element.type === 'text') {
+            const context = canvas.getContext('2d')
+            if (!context) return
+
+            context.save()
+            context.setLineDash([5, 5])
+
+            // TODO: find a way to offset the dashed selection
+            for (let i = 0; i < element.lines.length; i++) {
+              context.strokeRect(
+                element.lines[i].lineX1,
+                element.lines[i].lineY1,
+                element.lines[i].lineWidth,
+                element.lines[i].lineHeight
+              )
+            }
+            context.restore()
+            return
           }
         },
       })
