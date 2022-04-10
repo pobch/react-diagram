@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
 import { createLineElement } from './CanvasForLine'
 import { adjustRectangleCoordinates, createRectangleElement } from './CanvasForRect'
@@ -444,9 +444,14 @@ export function CanvasForSelection({
       actionState.action === 'resizing' ||
       actionState.action === 'selecting'
     ) {
-      // draw dashed selection as an extra
+      // Typescript won't automatically check for `undefined` possibility
+      // ... which can be happened from acessing an non-existing array's index.
+      // Therefore, we need to add `undefined` type ourself or enable `noUncheckedIndexedAccess` rule.
+      const selectingElement: TSnapshot[number] | undefined =
+        elementsSnapshot[actionState.data.elementId]
+      // draw dashed selection around all selecting elements as an extra
       drawScene({
-        elements: [elementsSnapshot[actionState.data.elementId]],
+        elements: selectingElement ? Array.of(selectingElement) : [],
         drawFn: (element, canvas) => {
           if (element.type === 'rectangle') {
             const roughCanvas = rough.canvas(canvas)
@@ -561,6 +566,27 @@ export function CanvasForSelection({
     drawScene()
     return
   }, [actionState, drawScene, elementsSnapshot])
+
+  // ?? Is there any better approach
+  // Reset actionState when it is holding an element's id that is not being drawn in the canvas.
+  // Example case#1:
+  // 1. Click to select the latest created element (the element id is recorded in actionState)
+  // 2. Click undo until the selecting element disappear (at this state, the snapshot revert
+  //    to the point that does not have this element at all, but actionState is still holding the element id)
+  // Case#2:
+  // 1. Click to select any element
+  // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
+  //    but actionState still holding its id)
+  useEffect(() => {
+    if (actionState.action !== 'none') {
+      if (
+        !elementsSnapshot[actionState.data.elementId] ||
+        elementsSnapshot[actionState.data.elementId].type === 'removed'
+      ) {
+        setActionState({ action: 'none' })
+      }
+    }
+  }, [actionState, elementsSnapshot])
 
   function handlePointerDown(e: React.PointerEvent) {
     if (actionState.action === 'none') {
@@ -835,6 +861,18 @@ export function CanvasForSelection({
     }
   }
 
+  function handleClickDeleteElement() {
+    if (actionState.action === 'selecting') {
+      const newElementsSnapshot = [...elementsSnapshot]
+      newElementsSnapshot[actionState.data.elementId] = {
+        type: 'removed',
+        id: actionState.data.elementId,
+      }
+      addNewHistory(newElementsSnapshot)
+      return
+    }
+  }
+
   return (
     <>
       {/* TODO: find better approach for measure text dimension */}
@@ -846,6 +884,13 @@ export function CanvasForSelection({
       >
         For measure text
       </canvas>
+
+      {/* floating delete button at top-left of the screen */}
+      {actionState.action === 'selecting' ? (
+        <div style={{ position: 'fixed', top: '1.5rem', left: '0.5rem' }}>
+          <button onClick={handleClickDeleteElement}>X</button>
+        </div>
+      ) : null}
 
       {renderCanvas({
         onPointerDown: handlePointerDown,

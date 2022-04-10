@@ -252,7 +252,7 @@ export function App() {
     }
   }
 
-  function zoomIn() {
+  function handleClickZoomIn() {
     if (!canvasRef.current) return
 
     const dpr = window.devicePixelRatio
@@ -271,7 +271,7 @@ export function App() {
     })
   }
 
-  function zoomOut() {
+  function handleClickZoomOut() {
     if (!canvasRef.current) return
 
     const dpr = window.devicePixelRatio
@@ -290,7 +290,7 @@ export function App() {
     })
   }
 
-  function resetZoom() {
+  function handleClickResetPanZoom() {
     setZoomLevel(1)
     setOriginOffset({ x: 0, y: 0 })
   }
@@ -299,7 +299,15 @@ export function App() {
   return (
     <div>
       {/* Top Menu */}
-      <fieldset style={{ position: 'fixed', top: 0, margin: '0.5rem', padding: '0.25rem' }}>
+      <fieldset
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: '1.5rem',
+          margin: '0.5rem',
+          padding: '0.25rem',
+        }}
+      >
         <legend>Tool</legend>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <input
@@ -376,13 +384,13 @@ export function App() {
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={zoomOut}>Zoom Out</button>
+          <button onClick={handleClickZoomOut}>Zoom Out</button>
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={resetZoom}>Reset</button>
+          <button onClick={handleClickResetPanZoom}>Reset</button>
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={zoomIn}>Zoom In</button>
+          <button onClick={handleClickZoomIn}>Zoom In</button>
         </span>
       </div>
 
