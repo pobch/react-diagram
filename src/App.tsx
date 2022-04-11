@@ -68,8 +68,12 @@ function useHistory() {
     })
   }
 
+  const currentSnapshot = history[currentIndex]
+  if (!currentSnapshot) {
+    throw new Error('The whole current snapshot is not exist in history!!')
+  }
   return {
-    elementsSnapshot: history[currentIndex],
+    elementsSnapshot: currentSnapshot,
     addNewHistory,
     replaceCurrentHistory,
     undo,
@@ -83,10 +87,12 @@ export function getSvgPathFromStroke(stroke: number[][]) {
 
   const d = stroke.reduce(
     (acc, [x0, y0], i, arr) => {
+      // @ts-expect-error: noUncheckedIndexedAccess
       const [x1, y1] = arr[(i + 1) % arr.length]
       acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2)
       return acc
     },
+    // @ts-expect-error: noUncheckedIndexedAccess
     ['M', ...stroke[0], 'Q']
   )
 
@@ -152,11 +158,9 @@ export function App() {
           context.textBaseline = 'top'
           context.font = '1.5rem "Nanum Pen Script"'
           for (let i = 0; i < element.lines.length; i++) {
-            context.fillText(
-              element.lines[i].lineContent,
-              element.lines[i].lineX1,
-              element.lines[i].lineY1
-            )
+            const line = element.lines[i]
+            if (!line) continue
+            context.fillText(line.lineContent, line.lineX1, line.lineY1)
           }
         } else if (element.type === 'removed') {
           // don't draw

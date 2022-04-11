@@ -79,8 +79,8 @@ export function CanvasForLine({
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'line') {
-        throw new Error('The last element in the current snapshot is not a "line" type')
+      if (!lastElement || lastElement.type !== 'line') {
+        throw new Error('The last element in the current snapshot is not a "line" element')
       }
       const { x1: currentX1, y1: currentY1 } = lastElement
       const newElement = createLineElement({

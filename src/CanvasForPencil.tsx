@@ -81,8 +81,8 @@ export function CanvasForPencil({
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'pencil') {
-        throw new Error('The last element in the snapshot is not a "pencil" type')
+      if (!lastElement || lastElement.type !== 'pencil') {
+        throw new Error('The last element in the snapshot is not a "pencil" element')
       }
       const newElement = updatePencilElement({
         id: lastIndex,

@@ -99,8 +99,8 @@ export function CanvasForRect({
       // replace last element
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'rectangle') {
-        throw new Error('The last element in the current snapshot is not a "rectangle" type')
+      if (!lastElement || lastElement.type !== 'rectangle') {
+        throw new Error('The last element in the current snapshot is not a "rectangle" element')
       }
       const { x1: currentX1, y1: currentY1 } = lastElement
       const newElement = createRectangleElement({
@@ -123,8 +123,8 @@ export function CanvasForRect({
       // adjust coord when finish drawing
       const lastIndex = elementsSnapshot.length - 1
       const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'rectangle') {
-        throw new Error('The last element in the current snapshot is not a "rectangle" type')
+      if (!lastElement || lastElement.type !== 'rectangle') {
+        throw new Error('The last element in the current snapshot is not a "rectangle" element')
       }
       const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(lastElement)
       const newElement = createRectangleElement({

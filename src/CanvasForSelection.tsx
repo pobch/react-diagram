@@ -187,6 +187,9 @@ function getFirstElementAtPosition({
       for (let i = 0; i < element.points.length - 1; i++) {
         const currentPoint = element.points[i]
         const nextPoint = element.points[i + 1]
+        if (!currentPoint || !nextPoint) {
+          throw new Error('There is a missing point (x,y) within the pencil path!!')
+        }
         if (
           isOnLine({
             xPosition,
@@ -278,8 +281,8 @@ function createMovingActionData({
       return {
         elementType: 'text',
         elementId: movingElement.id,
-        pointerOffsetX1: pointerX - movingElement.lines[0].lineX1,
-        pointerOffsetY1: pointerY - movingElement.lines[0].lineY1,
+        pointerOffsetX1: pointerX - (movingElement.lines[0]?.lineX1 ?? pointerX),
+        pointerOffsetY1: pointerY - (movingElement.lines[0]?.lineY1 ?? pointerY),
         content: movingElement.lines.map(({ lineContent }) => lineContent).join('\n'),
       }
     default:
@@ -444,14 +447,10 @@ export function CanvasForSelection({
       actionState.action === 'resizing' ||
       actionState.action === 'selecting'
     ) {
-      // Typescript won't automatically check for `undefined` possibility
-      // ... which can be happened from acessing an non-existing array's index.
-      // Therefore, we need to add `undefined` type ourself or enable `noUncheckedIndexedAccess` rule.
-      const selectingElement: TSnapshot[number] | undefined =
-        elementsSnapshot[actionState.data.elementId]
-      // draw dashed selection around all selecting elements as an extra
+      const selectedElement = elementsSnapshot[actionState.data.elementId]
+      // draw dashed selection around all selected elements as an extra
       drawScene({
-        elements: selectingElement ? Array.of(selectingElement) : [],
+        elements: selectedElement ? Array.of(selectedElement) : [],
         drawFn: (element, canvas) => {
           if (element.type === 'rectangle') {
             const roughCanvas = rough.canvas(canvas)
@@ -547,12 +546,9 @@ export function CanvasForSelection({
 
             // TODO: find a way to offset the dashed selection
             for (let i = 0; i < element.lines.length; i++) {
-              context.strokeRect(
-                element.lines[i].lineX1,
-                element.lines[i].lineY1,
-                element.lines[i].lineWidth,
-                element.lines[i].lineHeight
-              )
+              const line = element.lines[i]
+              if (!line) continue
+              context.strokeRect(line.lineX1, line.lineY1, line.lineWidth, line.lineHeight)
             }
             context.restore()
             return
@@ -571,7 +567,7 @@ export function CanvasForSelection({
   // Reset actionState when it is holding an element's id that is not being drawn in the canvas.
   // Example case#1:
   // 1. Click to select the latest created element (the element id is recorded in actionState)
-  // 2. Click undo until the selecting element disappear (at this state, the snapshot revert
+  // 2. Click undo until the selected element disappear (at this state, the snapshot revert
   //    to the point that does not have this element at all, but actionState is still holding the element id)
   // Case#2:
   // 1. Click to select any element
@@ -579,10 +575,8 @@ export function CanvasForSelection({
   //    but actionState still holding its id)
   useEffect(() => {
     if (actionState.action !== 'none') {
-      if (
-        !elementsSnapshot[actionState.data.elementId] ||
-        elementsSnapshot[actionState.data.elementId].type === 'removed'
-      ) {
+      const selectedElementInSnapshot = elementsSnapshot[actionState.data.elementId]
+      if (!selectedElementInSnapshot || selectedElementInSnapshot.type === 'removed') {
         setActionState({ action: 'none' })
       }
     }
@@ -837,8 +831,8 @@ export function CanvasForSelection({
     if (actionState.action === 'resizing' && actionState.data.elementType === 'rectangle') {
       const selectedIndex = actionState.data.elementId
       const selectedElement = elementsSnapshot[selectedIndex]
-      if (selectedElement.type !== 'rectangle') {
-        throw new Error('The resizing element is not a "rectangle" type')
+      if (!selectedElement || selectedElement.type !== 'rectangle') {
+        throw new Error('The resizing element is not a "rectangle" element')
       }
       const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(selectedElement)
       const newElement = createRectangleElement({

@@ -63,9 +63,9 @@ export function createTextElement({
     lines.push({
       lineX1: x1,
       lineY1: currentY,
-      lineWidth: context.measureText(contentLines[i]).width,
+      lineWidth: context.measureText(contentLines[i] ?? '').width,
       lineHeight: lineHeight,
-      lineContent: contentLines[i],
+      lineContent: contentLines[i] ?? '',
     })
     currentY = currentY + lineHeight
   }
@@ -177,8 +177,8 @@ export function CanvasForText({
           action: 'updating',
           data: {
             id: firstFoundElement.id,
-            textareaX1: firstFoundElement.lines[0].lineX1,
-            textareaY1: firstFoundElement.lines[0].lineY1,
+            textareaX1: firstFoundElement.lines[0]?.lineX1 ?? sceneX,
+            textareaY1: firstFoundElement.lines[0]?.lineY1 ?? sceneY,
             textareaWidth: firstFoundElement.lines.reduce((prev, curr) => {
               // TODO: remove magic number '8'
               return Math.max(curr.lineWidth + 8, prev)
