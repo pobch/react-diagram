@@ -1,6 +1,6 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
-import { createLineElementWithoutId } from './CanvasForLine'
+import { createLinearElementWithoutId } from './CanvasForLinear'
 import { adjustRectangleCoordinates, createRectangleElementWithoutId } from './CanvasForRect'
 import {
   getSvgPathFromStroke,
@@ -83,7 +83,7 @@ function getFirstElementAtPosition({
 
   // 1st loop
   for (let element of elementsSnapshot) {
-    if (element.type === 'line') {
+    if (element.type === 'line' || element.type === 'arrow') {
       // check if a pointer is at (x1, y1)
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
         firstFoundElement = element
@@ -253,8 +253,9 @@ function createMoveData({
 }): TMoveData {
   switch (targetElement.type) {
     case 'line':
+    case 'arrow':
       return {
-        elementType: 'line',
+        elementType: targetElement.type,
         elementId: targetElement.id,
         pointerOffsetX1: pointerX - targetElement.x1,
         pointerOffsetY1: pointerY - targetElement.y1,
@@ -297,11 +298,12 @@ function createResizeData({
 }): TResizeData {
   switch (targetElement.type) {
     case 'line':
+    case 'arrow':
       if (pointerPosition !== 'start' && pointerPosition !== 'end') {
         throw new Error('Impossible pointer position for resizing line element')
       }
       return {
-        elementType: 'line',
+        elementType: targetElement.type,
         elementId: targetElement.id,
         pointerPosition: pointerPosition,
       }
@@ -326,7 +328,7 @@ function createResizeData({
 
 type TMoveData =
   | {
-      elementType: 'line' | 'rectangle'
+      elementType: 'line' | 'rectangle' | 'arrow'
       elementId: number
       pointerOffsetX1: number
       pointerOffsetY1: number
@@ -345,7 +347,7 @@ type TMoveData =
     }
 type TResizeData =
   | {
-      elementType: 'line'
+      elementType: 'line' | 'arrow'
       elementId: number
       pointerPosition: 'start' | 'end'
     }
@@ -471,7 +473,7 @@ export function CanvasForSelection({
               dashOffset * 2
             )
             return
-          } else if (element.type === 'line') {
+          } else if (element.type === 'line' || element.type === 'arrow') {
             const roughCanvas = rough.canvas(canvas)
             const dashOffset = 5
 
@@ -710,13 +712,18 @@ export function CanvasForSelection({
       if (!movingElement) {
         throw new Error('You are trying to move an non-exist element in the current snapshot!!')
       }
-      if (uiState.data.elementType === 'line' && movingElement.type === 'line') {
+
+      if (
+        (uiState.data.elementType === 'line' && movingElement.type === 'line') ||
+        (uiState.data.elementType === 'arrow' && movingElement.type === 'arrow')
+      ) {
         const newX1 = sceneX - uiState.data.pointerOffsetX1
         const newY1 = sceneY - uiState.data.pointerOffsetY1
         // keep existing line width
         const distanceX = movingElement.x2 - movingElement.x1
         const distanceY = movingElement.y2 - movingElement.y1
-        const newElementWithoutId = createLineElementWithoutId({
+        const newElementWithoutId = createLinearElementWithoutId({
+          lineType: movingElement.type,
           x1: newX1,
           y1: newY1,
           x2: newX1 + distanceX,
@@ -783,9 +790,13 @@ export function CanvasForSelection({
       if (!resizingElement) {
         throw new Error('You are trying to resize an non-exist element in the current snapshot!!')
       }
-      if (uiState.data.elementType === 'line' && resizingElement.type === 'line') {
+      if (
+        (uiState.data.elementType === 'line' && resizingElement.type === 'line') ||
+        (uiState.data.elementType === 'arrow' && resizingElement.type === 'arrow')
+      ) {
         if (uiState.data.pointerPosition === 'start') {
-          const newElementWithoutId = createLineElementWithoutId({
+          const newElementWithoutId = createLinearElementWithoutId({
+            lineType: resizingElement.type,
             x1: sceneX,
             y1: sceneY,
             x2: resizingElement.x2,
@@ -794,7 +805,8 @@ export function CanvasForSelection({
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
           return
         } else if (uiState.data.pointerPosition === 'end') {
-          const newElementWithoutId = createLineElementWithoutId({
+          const newElementWithoutId = createLinearElementWithoutId({
+            lineType: resizingElement.type,
             x1: resizingElement.x1,
             y1: resizingElement.y1,
             x2: sceneX,
