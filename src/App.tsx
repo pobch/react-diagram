@@ -3,7 +3,7 @@ import { Drawable } from 'roughjs/bin/core'
 import rough from 'roughjs/bundled/rough.esm'
 import { CanvasForSelection } from './CanvasForSelection'
 import { CanvasForRect } from './CanvasForRect'
-import { CanvasForLine } from './CanvasForLine'
+import { CanvasForLinear } from './CanvasForLinear'
 import { CanvasForPencil } from './CanvasForPencil'
 import getStroke from 'perfect-freehand'
 import { CanvasForText } from './CanvasForText'
@@ -11,13 +11,13 @@ import { CanvasForHand } from './CanvasForHand'
 
 export type TElementData =
   | {
-      type: 'line' | 'rectangle'
+      type: 'line' | 'rectangle' | 'arrow'
       id: number
       x1: number
       y1: number
       x2: number
       y2: number
-      roughElement: Drawable
+      roughElements: Drawable[]
     }
   | {
       type: 'pencil'
@@ -150,9 +150,9 @@ export function getSvgPathFromStroke(stroke: number[][]) {
 }
 
 export function App() {
-  const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand'>(
-    'selection'
-  )
+  const [tool, setTool] = useState<
+    'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand' | 'arrow'
+  >('selection')
   const { elementsSnapshot, commitNewSnapshot, replaceCurrentSnapshot, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -197,8 +197,10 @@ export function App() {
 
       const roughCanvas = rough.canvas(canvas)
       elementsSnapshot.forEach((element) => {
-        if (element.type === 'line' || element.type === 'rectangle') {
-          roughCanvas.draw(element.roughElement)
+        if (element.type === 'line' || element.type === 'rectangle' || element.type === 'arrow') {
+          element.roughElements.forEach((roughElement) => {
+            roughCanvas.draw(roughElement)
+          })
         } else if (element.type === 'pencil') {
           const stroke = getSvgPathFromStroke(getStroke(element.points, { size: 4 }))
           // context.fillStyle = 'red'
@@ -422,6 +424,16 @@ export function App() {
           />
           <label htmlFor="hand">Hand</label>
         </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <input
+            type="radio"
+            id="arrow"
+            checked={tool === 'arrow'}
+            onChange={() => setTool('arrow')}
+            style={{ marginInlineEnd: '0.25rem' }}
+          />
+          <label htmlFor="arrow">Arrow</label>
+        </span>
       </fieldset>
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
@@ -473,12 +485,13 @@ export function App() {
             )
           case 'line':
             return (
-              <CanvasForLine
+              <CanvasForLinear
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
                 replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                lineType="line"
               />
             )
           case 'pencil':
@@ -508,6 +521,17 @@ export function App() {
                 renderCanvas={renderCanvas}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 setOriginOffset={setOriginOffset}
+              />
+            )
+          case 'arrow':
+            return (
+              <CanvasForLinear
+                renderCanvas={renderCanvas}
+                elementsSnapshot={elementsSnapshot}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                lineType="arrow"
               />
             )
         }

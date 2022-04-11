@@ -20,7 +20,7 @@ export function createRectangleElementWithoutId({
   y1: number
   width: number
   height: number
-}): Omit<Extract<TElementData, { type: 'line' | 'rectangle' }>, 'id'> {
+}): Omit<Extract<TElementData, { type: 'line' | 'rectangle' | 'arrow' }>, 'id'> {
   const roughElement = generator.rectangle(x1, y1, width, height)
   return {
     x1: x1,
@@ -28,13 +28,13 @@ export function createRectangleElementWithoutId({
     x2: x1 + width,
     y2: y1 + height,
     type: 'rectangle',
-    roughElement,
+    roughElements: [roughElement],
   }
 }
 
 // make (x1, y1) always on the top-left and (x2, y2) always on the bottom-right
 export function adjustRectangleCoordinates(
-  element: Extract<TElementData, { type: 'line' | 'rectangle' }>
+  element: Extract<TElementData, { type: 'line' | 'rectangle' | 'arrow' }>
 ) {
   const { x1, x2, y1, y2 } = element
   const minX = Math.min(x1, x2)
