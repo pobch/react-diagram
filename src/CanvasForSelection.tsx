@@ -39,7 +39,7 @@ function getFirstElementAtPosition({
     xPoint: number
     yPoint: number
   }): boolean {
-    const THRESHOLD = 5
+    const THRESHOLD = 8
     return Math.abs(xPosition - xPoint) < THRESHOLD && Math.abs(yPosition - yPoint) < THRESHOLD
   }
   // check if (xPosition, yPosition) is on the line
@@ -236,43 +236,35 @@ function getFirstElementAtPosition({
   return { pointerPosition, firstFoundElement }
 }
 
-function createMovingActionData({
-  movingElement,
+function createMoveData({
+  targetElement,
   pointerX,
   pointerY,
 }: {
-  movingElement: TElementData
+  targetElement: TElementData
   pointerX: number
   pointerY: number
-}): TMovingActionData {
-  switch (movingElement.type) {
+}): TMoveData {
+  switch (targetElement.type) {
     case 'line':
       return {
         elementType: 'line',
-        elementId: movingElement.id,
-        x1: movingElement.x1,
-        y1: movingElement.y1,
-        x2: movingElement.x2,
-        y2: movingElement.y2,
-        pointerOffsetX1: pointerX - movingElement.x1,
-        pointerOffsetY1: pointerY - movingElement.y1,
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - targetElement.x1,
+        pointerOffsetY1: pointerY - targetElement.y1,
       }
     case 'rectangle':
       return {
         elementType: 'rectangle',
-        elementId: movingElement.id,
-        x1: movingElement.x1,
-        y1: movingElement.y1,
-        x2: movingElement.x2,
-        y2: movingElement.y2,
-        pointerOffsetX1: pointerX - movingElement.x1,
-        pointerOffsetY1: pointerY - movingElement.y1,
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - targetElement.x1,
+        pointerOffsetY1: pointerY - targetElement.y1,
       }
     case 'pencil':
       return {
         elementType: 'pencil',
-        elementId: movingElement.id,
-        pointerOffsetFromPoints: movingElement.points.map((point) => ({
+        elementId: targetElement.id,
+        pointerOffsetFromPoints: targetElement.points.map((point) => ({
           offsetX: pointerX - point.x,
           offsetY: pointerY - point.y,
         })),
@@ -280,35 +272,31 @@ function createMovingActionData({
     case 'text':
       return {
         elementType: 'text',
-        elementId: movingElement.id,
-        pointerOffsetX1: pointerX - (movingElement.lines[0]?.lineX1 ?? pointerX),
-        pointerOffsetY1: pointerY - (movingElement.lines[0]?.lineY1 ?? pointerY),
-        content: movingElement.lines.map(({ lineContent }) => lineContent).join('\n'),
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - (targetElement.lines[0]?.lineX1 ?? pointerX),
+        pointerOffsetY1: pointerY - (targetElement.lines[0]?.lineY1 ?? pointerY),
+        content: targetElement.lines.map(({ lineContent }) => lineContent).join('\n'),
       }
     default:
       throw new Error('Unsupported moving element type')
   }
 }
 
-function createResizingActionData({
-  resizingElement,
+function createResizeData({
+  targetElement,
   pointerPosition,
 }: {
-  resizingElement: TElementData
+  targetElement: TElementData
   pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br'
-}): TResizingActionData {
-  switch (resizingElement.type) {
+}): TResizeData {
+  switch (targetElement.type) {
     case 'line':
       if (pointerPosition !== 'start' && pointerPosition !== 'end') {
         throw new Error('Impossible pointer position for resizing line element')
       }
       return {
         elementType: 'line',
-        elementId: resizingElement.id,
-        x1: resizingElement.x1,
-        y1: resizingElement.y1,
-        x2: resizingElement.x2,
-        y2: resizingElement.y2,
+        elementId: targetElement.id,
         pointerPosition: pointerPosition,
       }
     case 'rectangle':
@@ -322,11 +310,7 @@ function createResizingActionData({
       }
       return {
         elementType: 'rectangle',
-        elementId: resizingElement.id,
-        x1: resizingElement.x1,
-        y1: resizingElement.y1,
-        x2: resizingElement.x2,
-        y2: resizingElement.y2,
+        elementId: targetElement.id,
         pointerPosition: pointerPosition,
       }
     default:
@@ -334,24 +318,10 @@ function createResizingActionData({
   }
 }
 
-type TMovingActionData =
+type TMoveData =
   | {
-      elementType: 'line'
+      elementType: 'line' | 'rectangle'
       elementId: number
-      x1: number
-      y1: number
-      x2: number
-      y2: number
-      pointerOffsetX1: number
-      pointerOffsetY1: number
-    }
-  | {
-      elementType: 'rectangle'
-      elementId: number
-      x1: number
-      y1: number
-      x2: number
-      y2: number
       pointerOffsetX1: number
       pointerOffsetY1: number
     }
@@ -367,40 +337,40 @@ type TMovingActionData =
       pointerOffsetY1: number
       content: string
     }
-type TResizingActionData =
+type TResizeData =
   | {
       elementType: 'line'
       elementId: number
-      x1: number
-      y1: number
-      x2: number
-      y2: number
       pointerPosition: 'start' | 'end'
     }
   | {
       elementType: 'rectangle'
       elementId: number
-      x1: number
-      y1: number
-      x2: number
-      y2: number
       pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
     }
 
-type TActionState =
+type TUiState =
   | {
-      action: 'none'
+      state: 'none'
     }
   | {
-      action: 'moving'
-      data: TMovingActionData
+      state: 'initMove'
+      data: TMoveData
     }
   | {
-      action: 'resizing'
-      data: TResizingActionData
+      state: 'initResize'
+      data: TResizeData
     }
   | {
-      action: 'selecting'
+      state: 'moving'
+      data: TMoveData
+    }
+  | {
+      state: 'resizing'
+      data: TResizeData
+    }
+  | {
+      state: 'idleSelecting'
       data: {
         elementId: number
       }
@@ -437,17 +407,19 @@ export function CanvasForSelection({
     drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
   }) => void
 }) {
-  const [actionState, setActionState] = useState<TActionState>({ action: 'none' })
+  const [uiState, setUiState] = useState<TUiState>({ state: 'none' })
 
   // useLayoutEffect() in the parent will be ignored in case of a selection tool.
   // ... Therefore, all canvas drawing logics need to be here instead.
   useLayoutEffect(() => {
     if (
-      actionState.action === 'moving' ||
-      actionState.action === 'resizing' ||
-      actionState.action === 'selecting'
+      uiState.state === 'initMove' ||
+      uiState.state === 'initResize' ||
+      uiState.state === 'moving' ||
+      uiState.state === 'resizing' ||
+      uiState.state === 'idleSelecting'
     ) {
-      const selectedElement = elementsSnapshot[actionState.data.elementId]
+      const selectedElement = elementsSnapshot[uiState.data.elementId]
       // draw dashed selection around all selected elements as an extra
       drawScene({
         elements: selectedElement ? Array.of(selectedElement) : [],
@@ -561,7 +533,7 @@ export function CanvasForSelection({
     // no extra dashed selection being drawn
     drawScene()
     return
-  }, [actionState, drawScene, elementsSnapshot])
+  }, [uiState, drawScene, elementsSnapshot])
 
   // ?? Is there any better approach
   // Reset actionState when it is holding an element's id that is not being drawn in the canvas.
@@ -574,16 +546,23 @@ export function CanvasForSelection({
   // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
   //    but actionState still holding its id)
   useEffect(() => {
-    if (actionState.action !== 'none') {
-      const selectedElementInSnapshot = elementsSnapshot[actionState.data.elementId]
+    if (
+      uiState.state === 'initMove' ||
+      uiState.state === 'initResize' ||
+      uiState.state === 'moving' ||
+      uiState.state === 'resizing' ||
+      uiState.state === 'idleSelecting'
+    ) {
+      const selectedElementInSnapshot = elementsSnapshot[uiState.data.elementId]
       if (!selectedElementInSnapshot || selectedElementInSnapshot.type === 'removed') {
-        setActionState({ action: 'none' })
+        setUiState({ state: 'none' })
       }
     }
-  }, [actionState, elementsSnapshot])
+  }, [uiState, elementsSnapshot])
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (actionState.action === 'none') {
+    // should come from previous onPointerDown() or initial state when mount
+    if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
@@ -597,18 +576,18 @@ export function CanvasForSelection({
       if (!selected) return
 
       // when current action is "none", we only allow to move an element
-      setActionState({
-        action: 'moving',
-        data: createMovingActionData({
-          movingElement: selected.firstFoundElement,
+      setUiState({
+        state: 'initMove',
+        data: createMoveData({
+          targetElement: selected.firstFoundElement,
           pointerX: sceneX,
           pointerY: sceneY,
         }),
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      addNewHistory(newElementsSnapshot)
       return
-    } else if (actionState.action === 'selecting') {
+    }
+    // should come from onPointerUp()
+    else if (uiState.state === 'idleSelecting') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
@@ -620,19 +599,19 @@ export function CanvasForSelection({
       })
       // a pointer is not click on any elements
       if (!selected) {
-        setActionState({
-          action: 'none',
+        setUiState({
+          state: 'none',
         })
         return
       }
 
-      // when the current action is "selecting", we allow to either move or resize an element
+      // when the current action is "idleSelecting", we allow to either move or resize an element
       // ... so, we need to check which part of the element was clicked
       if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
-        setActionState({
-          action: 'moving',
-          data: createMovingActionData({
-            movingElement: selected.firstFoundElement,
+        setUiState({
+          state: 'initMove',
+          data: createMoveData({
+            targetElement: selected.firstFoundElement,
             pointerX: sceneX,
             pointerY: sceneY,
           }),
@@ -645,18 +624,16 @@ export function CanvasForSelection({
         selected.pointerPosition === 'br' ||
         selected.pointerPosition === 'bl'
       ) {
-        setActionState({
-          action: 'resizing',
-          data: createResizingActionData({
-            resizingElement: selected.firstFoundElement,
+        setUiState({
+          state: 'initResize',
+          data: createResizeData({
+            targetElement: selected.firstFoundElement,
             pointerPosition: selected.pointerPosition,
           }),
         })
       } else {
         throw new Error(`${selected.pointerPosition} pointer position is not supported`)
       }
-      const newElementsSnapshot = [...elementsSnapshot]
-      addNewHistory(newElementsSnapshot)
       return
     }
   }
@@ -672,6 +649,7 @@ export function CanvasForSelection({
       viewportY: e.clientY,
     })
 
+    // TODO: separate between "none" and "idleSelecting" state
     // cursor UI
     const hovered = getFirstElementAtPosition({
       elementsSnapshot: elementsSnapshot,
@@ -695,18 +673,32 @@ export function CanvasForSelection({
       setCursorType('default')
     }
 
-    // moving logics
-    if (actionState.action === 'moving') {
+    // should come from onPointerDown()
+    if (uiState.state === 'initMove') {
+      const newElementsSnapshot = [...elementsSnapshot]
+      addNewHistory(newElementsSnapshot)
+      setUiState({
+        state: 'moving',
+        data: { ...uiState.data },
+      })
+      return
+    }
+    // should come from previous onPointerMove()
+    if (uiState.state === 'moving') {
       // replace specific element
-      const index = actionState.data.elementId
+      const index = uiState.data.elementId
       const newElementsSnapshot = [...elementsSnapshot]
 
-      if (actionState.data.elementType === 'line') {
-        const newX1 = sceneX - actionState.data.pointerOffsetX1
-        const newY1 = sceneY - actionState.data.pointerOffsetY1
+      const movingElement = elementsSnapshot[uiState.data.elementId]
+      if (!movingElement) {
+        throw new Error('You are trying to move an non-exist element in the current snapshot!!')
+      }
+      if (uiState.data.elementType === 'line' && movingElement.type === 'line') {
+        const newX1 = sceneX - uiState.data.pointerOffsetX1
+        const newY1 = sceneY - uiState.data.pointerOffsetY1
         // keep existing line width
-        const distanceX = actionState.data.x2 - actionState.data.x1
-        const distanceY = actionState.data.y2 - actionState.data.y1
+        const distanceX = movingElement.x2 - movingElement.x1
+        const distanceY = movingElement.y2 - movingElement.y1
         const newElement = createLineElement({
           id: index,
           x1: newX1,
@@ -715,12 +707,14 @@ export function CanvasForSelection({
           y2: newY1 + distanceY,
         })
         newElementsSnapshot[index] = newElement
-      } else if (actionState.data.elementType === 'rectangle') {
-        const newX1 = sceneX - actionState.data.pointerOffsetX1
-        const newY1 = sceneY - actionState.data.pointerOffsetY1
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else if (uiState.data.elementType === 'rectangle' && movingElement.type === 'rectangle') {
+        const newX1 = sceneX - uiState.data.pointerOffsetX1
+        const newY1 = sceneY - uiState.data.pointerOffsetY1
         // keep existing width + height
-        const width = actionState.data.x2 - actionState.data.x1
-        const height = actionState.data.y2 - actionState.data.y1
+        const width = movingElement.x2 - movingElement.x1
+        const height = movingElement.y2 - movingElement.y1
         const newElement = createRectangleElement({
           id: index,
           x1: newX1,
@@ -729,8 +723,10 @@ export function CanvasForSelection({
           height: height,
         })
         newElementsSnapshot[index] = newElement
-      } else if (actionState.data.elementType === 'pencil') {
-        const newPoints = actionState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else if (uiState.data.elementType === 'pencil' && movingElement.type === 'pencil') {
+        const newPoints = uiState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
           x: sceneX - offsetX,
           y: sceneY - offsetY,
         }))
@@ -740,96 +736,126 @@ export function CanvasForSelection({
           points: newPoints,
         }
         newElementsSnapshot[index] = newElement
-      } else if (actionState.data.elementType === 'text') {
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else if (uiState.data.elementType === 'text' && movingElement.type === 'text') {
         const newElement: TElementData = createTextElement({
           id: index,
           canvasForMeasure: canvasForMeasureRef.current,
-          content: actionState.data.content,
+          content: uiState.data.content,
           isWriting: false,
-          x1: sceneX - actionState.data.pointerOffsetX1,
-          y1: sceneY - actionState.data.pointerOffsetY1,
+          x1: sceneX - uiState.data.pointerOffsetX1,
+          y1: sceneY - uiState.data.pointerOffsetY1,
         })
         newElementsSnapshot[index] = newElement
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else {
+        throw new Error('Mismatch between moving element data and actual element in the snapshot')
       }
-
-      replaceCurrentHistory(newElementsSnapshot)
-      return
     }
 
-    // resizing logics
-    if (actionState.action === 'resizing') {
+    // should come from onPointerDown()
+    if (uiState.state === 'initResize') {
+      const newElementsSnapshot = [...elementsSnapshot]
+      addNewHistory(newElementsSnapshot)
+      setUiState({
+        state: 'resizing',
+        data: { ...uiState.data },
+      })
+      return
+    }
+    // should come from previous onPointerMove()
+    if (uiState.state === 'resizing') {
       // replace specific element
-      const index = actionState.data.elementId
+      const index = uiState.data.elementId
       const newElementsSnapshot = [...elementsSnapshot]
 
-      if (actionState.data.elementType === 'line') {
-        if (actionState.data.pointerPosition === 'start') {
+      const resizingElement = elementsSnapshot[uiState.data.elementId]
+      if (!resizingElement) {
+        throw new Error('You are trying to resize an non-exist element in the current snapshot!!')
+      }
+      if (uiState.data.elementType === 'line' && resizingElement.type === 'line') {
+        if (uiState.data.pointerPosition === 'start') {
           const newElement = createLineElement({
             id: index,
             x1: sceneX,
             y1: sceneY,
-            x2: actionState.data.x2,
-            y2: actionState.data.y2,
+            x2: resizingElement.x2,
+            y2: resizingElement.y2,
           })
           newElementsSnapshot[index] = newElement
-        } else if (actionState.data.pointerPosition === 'end') {
+        } else if (uiState.data.pointerPosition === 'end') {
           const newElement = createLineElement({
             id: index,
-            x1: actionState.data.x1,
-            y1: actionState.data.y1,
+            x1: resizingElement.x1,
+            y1: resizingElement.y1,
             x2: sceneX,
             y2: sceneY,
           })
           newElementsSnapshot[index] = newElement
         }
-      } else if (actionState.data.elementType === 'rectangle') {
-        if (actionState.data.pointerPosition === 'tl') {
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else if (uiState.data.elementType === 'rectangle' && resizingElement.type === 'rectangle') {
+        if (uiState.data.pointerPosition === 'tl') {
           const newElement = createRectangleElement({
             id: index,
             x1: sceneX,
             y1: sceneY,
-            width: actionState.data.x2 - sceneX,
-            height: actionState.data.y2 - sceneY,
+            width: resizingElement.x2 - sceneX,
+            height: resizingElement.y2 - sceneY,
           })
           newElementsSnapshot[index] = newElement
-        } else if (actionState.data.pointerPosition === 'tr') {
+        } else if (uiState.data.pointerPosition === 'tr') {
           const newElement = createRectangleElement({
             id: index,
-            x1: actionState.data.x1,
+            x1: resizingElement.x1,
             y1: sceneY,
-            width: sceneX - actionState.data.x1,
-            height: actionState.data.y2 - sceneY,
+            width: sceneX - resizingElement.x1,
+            height: resizingElement.y2 - sceneY,
           })
           newElementsSnapshot[index] = newElement
-        } else if (actionState.data.pointerPosition === 'br') {
+        } else if (uiState.data.pointerPosition === 'br') {
           const newElement = createRectangleElement({
             id: index,
-            x1: actionState.data.x1,
-            y1: actionState.data.y1,
-            width: sceneX - actionState.data.x1,
-            height: sceneY - actionState.data.y1,
+            x1: resizingElement.x1,
+            y1: resizingElement.y1,
+            width: sceneX - resizingElement.x1,
+            height: sceneY - resizingElement.y1,
           })
           newElementsSnapshot[index] = newElement
-        } else if (actionState.data.pointerPosition === 'bl') {
+        } else if (uiState.data.pointerPosition === 'bl') {
           const newElement = createRectangleElement({
             id: index,
             x1: sceneX,
-            y1: actionState.data.y1,
-            width: actionState.data.x2 - sceneX,
-            height: sceneY - actionState.data.y1,
+            y1: resizingElement.y1,
+            width: resizingElement.x2 - sceneX,
+            height: sceneY - resizingElement.y1,
           })
           newElementsSnapshot[index] = newElement
         }
+        replaceCurrentHistory(newElementsSnapshot)
+        return
+      } else {
+        throw new Error('Mismatch between resizing element data and actual element in the snapshot')
       }
-
-      replaceCurrentHistory(newElementsSnapshot)
     }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    // should come straight from onPointerDown() without triggering onPointerMove()
+    if (uiState.state === 'initMove' || uiState.state === 'initResize') {
+      // the element is not actually move or resize
+      // don't do anything with history
+      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
+      return
+    }
+
+    // should come from onPointerMove()
     // adjust coordinates to handle the case when resizing flips the rectangle
-    if (actionState.action === 'resizing' && actionState.data.elementType === 'rectangle') {
-      const selectedIndex = actionState.data.elementId
+    if (uiState.state === 'resizing' && uiState.data.elementType === 'rectangle') {
+      const selectedIndex = uiState.data.elementId
       const selectedElement = elementsSnapshot[selectedIndex]
       if (!selectedElement || selectedElement.type !== 'rectangle') {
         throw new Error('The resizing element is not a "rectangle" element')
@@ -845,22 +871,23 @@ export function CanvasForSelection({
       const newElementsSnapshot = [...elementsSnapshot]
       newElementsSnapshot[selectedIndex] = newElement
       replaceCurrentHistory(newElementsSnapshot)
+      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
+      return
     }
 
-    // Go to "selecting" state after moving/resizing.
-    // onPointerDown() then allow "selecting" -> "none" state
-    if (actionState.action === 'moving' || actionState.action === 'resizing') {
-      setActionState({ action: 'selecting', data: { elementId: actionState.data.elementId } })
+    // should come from onPointerMove()
+    if (uiState.state === 'moving' || uiState.state === 'resizing') {
+      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
       return
     }
   }
 
   function handleClickDeleteElement() {
-    if (actionState.action === 'selecting') {
+    if (uiState.state === 'idleSelecting') {
       const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[actionState.data.elementId] = {
+      newElementsSnapshot[uiState.data.elementId] = {
         type: 'removed',
-        id: actionState.data.elementId,
+        id: uiState.data.elementId,
       }
       addNewHistory(newElementsSnapshot)
       return
@@ -880,7 +907,7 @@ export function CanvasForSelection({
       </canvas>
 
       {/* floating delete button at top-left of the screen */}
-      {actionState.action === 'selecting' ? (
+      {uiState.state === 'idleSelecting' ? (
         <div style={{ position: 'fixed', top: '1.5rem', left: '0.5rem' }}>
           <button onClick={handleClickDeleteElement}>X</button>
         </div>
