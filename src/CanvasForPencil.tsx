@@ -1,17 +1,19 @@
 import { useState } from 'react'
-import { TElementData, TSnapshot } from './App'
+import {
+  TCommitNewSnapshotParam,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './App'
 
-function createPencilElement({
-  id,
+function createPencilElementWithoutId({
   newX,
   newY,
 }: {
-  id: number
   newX: number
   newY: number
-}): Extract<TElementData, { type: 'pencil' }> {
+}): Omit<Extract<TElementData, { type: 'pencil' }>, 'id'> {
   return {
-    id,
     type: 'pencil',
     points: [{ x: newX, y: newY }],
   }
@@ -38,8 +40,8 @@ function updatePencilElement({
 export function CanvasForPencil({
   renderCanvas,
   elementsSnapshot,
-  addNewHistory,
-  replaceCurrentHistory,
+  commitNewSnapshot,
+  replaceCurrentSnapshot,
   viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
@@ -48,59 +50,70 @@ export function CanvasForPencil({
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
-  addNewHistory: (arg: TSnapshot) => void
-  replaceCurrentHistory: (arg: TSnapshot) => void
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
 }) {
-  const [action, setAction] = useState<'none' | 'drawing'>('none')
+  const [uiState, setUiState] = useState<
+    { state: 'none' } | { state: 'drawing'; data: { elementId: number } }
+  >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (action === 'none') {
+    // should come from onPointerUp() or initial state when mount
+    if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      const nextIndex = elementsSnapshot.length
-      const newElement = createPencilElement({ id: nextIndex, newX: sceneX, newY: sceneY })
-      const newElementsSnapshot = [...elementsSnapshot, newElement]
-      addNewHistory(newElementsSnapshot)
-      setAction('drawing')
+      const newElementWithoutId = createPencilElementWithoutId({
+        newX: sceneX,
+        newY: sceneY,
+      })
+      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+      if (newId === undefined) {
+        throw new Error('ID of the drawing pencil element is missing')
+      }
+      setUiState({
+        state: 'drawing',
+        data: { elementId: newId },
+      })
       return
     }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (action === 'drawing') {
+    // should come from onPointerDown() or previous onPointerMove()
+    if (uiState.state === 'drawing') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      // replace last element
-      const lastIndex = elementsSnapshot.length - 1
-      const lastElement = elementsSnapshot[lastIndex]
-      if (!lastElement || lastElement.type !== 'pencil') {
-        throw new Error('The last element in the snapshot is not a "pencil" element')
+      // replace the drawing element
+      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      if (!drawingElement || drawingElement.type !== 'pencil') {
+        throw new Error(
+          'The drawing element in the current snapshot is missing or not a "pencil" element'
+        )
       }
       const newElement = updatePencilElement({
-        id: lastIndex,
+        id: uiState.data.elementId,
         newX: sceneX,
         newY: sceneY,
-        currentPoints: lastElement.points,
+        currentPoints: drawingElement.points,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[lastIndex] = newElement
-
-      replaceCurrentHistory(newElementsSnapshot)
+      replaceCurrentSnapshot({ replacedElement: newElement })
       return
     }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    if (action === 'drawing') {
-      setAction('none')
+    // should come from onPointerMove()
+    if (uiState.state === 'drawing') {
+      setUiState({ state: 'none' })
+      return
     }
   }
 

@@ -1,5 +1,10 @@
 import { useRef, useState } from 'react'
-import { TElementData, TSnapshot } from './App'
+import {
+  TCommitNewSnapshotParam,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './App'
 
 export function getTextElementAtPosition({
   elementsSnapshot,
@@ -31,21 +36,19 @@ export function getTextElementAtPosition({
   return firstFoundElement
 }
 
-export function createTextElement({
-  id,
+export function createTextElementWithoutId({
   canvasForMeasure,
   content,
   x1,
   y1,
   isWriting,
 }: {
-  id: number
   canvasForMeasure: HTMLCanvasElement | null
   content: string
   x1: number
   y1: number
   isWriting: boolean
-}): Extract<TElementData, { type: 'text' }> {
+}): Omit<Extract<TElementData, { type: 'text' }>, 'id'> {
   // handle multi-line text https://stackoverflow.com/a/21574562
   if (!canvasForMeasure) {
     throw new Error('Temporary canvas for measure text width/height is not found')
@@ -71,7 +74,6 @@ export function createTextElement({
   }
   return {
     type: 'text',
-    id,
     isWriting,
     lines,
   }
@@ -80,9 +82,8 @@ export function createTextElement({
 export function CanvasForText({
   renderCanvas,
   elementsSnapshot,
-  addNewHistory,
-  replaceCurrentHistory,
-  undoHistory,
+  commitNewSnapshot,
+  replaceCurrentSnapshot,
   viewportCoordsToSceneCoords,
   sceneCoordsToViewportCoords,
 }: {
@@ -92,9 +93,8 @@ export function CanvasForText({
     styleCursor: 'default' | 'text'
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
-  addNewHistory: (arg: TSnapshot) => void
-  replaceCurrentHistory: (arg: TSnapshot) => void
-  undoHistory: () => void
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
+  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -104,10 +104,10 @@ export function CanvasForText({
     viewportY: number
   }
 }) {
-  const [actionState, setActionState] = useState<
-    | { action: 'none' }
+  const [uiState, setUiState] = useState<
+    | { state: 'none' }
     | {
-        action: 'creating'
+        state: 'creating'
         data: {
           textareaX1: number
           textareaY1: number
@@ -116,9 +116,9 @@ export function CanvasForText({
         }
       }
     | {
-        action: 'updating'
+        state: 'updating'
         data: {
-          id: number
+          elementId: number
           textareaX1: number
           textareaY1: number
           textareaWidth: number
@@ -127,12 +127,12 @@ export function CanvasForText({
         }
       }
   >({
-    action: 'none',
+    state: 'none',
   })
   const [cursorType, setCursorType] = useState<'default' | 'text'>('default')
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (actionState.action === 'creating' || actionState.action === 'updating') {
+    if (uiState.state === 'creating' || uiState.state === 'updating') {
       setCursorType('default')
       return
     }
@@ -141,12 +141,12 @@ export function CanvasForText({
       viewportX: e.clientX,
       viewportY: e.clientY,
     })
-    const firstFoundElement = getTextElementAtPosition({
+    const firstFoundTextElement = getTextElementAtPosition({
       elementsSnapshot,
       xPosition: sceneX,
       yPosition: sceneY,
     })
-    if (firstFoundElement) {
+    if (firstFoundTextElement) {
       setCursorType('text')
       return
     } else {
@@ -160,131 +160,96 @@ export function CanvasForText({
 
   function handleClick(e: React.MouseEvent) {
     // no textarea being displayed, will go to either creating or updating mode
-    if (actionState.action === 'none') {
+    // this click is for start writing
+    if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
 
-      const firstFoundElement = getTextElementAtPosition({
+      const firstFoundTextElement = getTextElementAtPosition({
         elementsSnapshot,
         xPosition: sceneX,
         yPosition: sceneY,
       })
       // found an existing text element, go to updating mode
-      if (firstFoundElement && firstFoundElement.type === 'text') {
-        setActionState({
-          action: 'updating',
+      if (firstFoundTextElement && firstFoundTextElement.type === 'text') {
+        setUiState({
+          state: 'updating',
           data: {
-            id: firstFoundElement.id,
-            textareaX1: firstFoundElement.lines[0]?.lineX1 ?? sceneX,
-            textareaY1: firstFoundElement.lines[0]?.lineY1 ?? sceneY,
-            textareaWidth: firstFoundElement.lines.reduce((prev, curr) => {
+            elementId: firstFoundTextElement.id,
+            textareaX1: firstFoundTextElement.lines[0]?.lineX1 ?? sceneX,
+            textareaY1: firstFoundTextElement.lines[0]?.lineY1 ?? sceneY,
+            textareaWidth: firstFoundTextElement.lines.reduce((prev, curr) => {
               // TODO: remove magic number '8'
               return Math.max(curr.lineWidth + 8, prev)
             }, 0),
-            textareaHeight: firstFoundElement.lines.reduce((prev, curr) => {
+            textareaHeight: firstFoundTextElement.lines.reduce((prev, curr) => {
               return prev + curr.lineHeight
               // TODO: remove magic number '16'
             }, 16),
-            content: firstFoundElement.lines.map(({ lineContent }) => lineContent).join('\n'),
+            content: firstFoundTextElement.lines.map(({ lineContent }) => lineContent).join('\n'),
           },
         })
-        const newElement: TElementData = {
-          type: 'text',
-          id: firstFoundElement.id,
-          isWriting: true,
-          lines: firstFoundElement.lines,
-        }
-        const newElementsSnapshot = [...elementsSnapshot]
-        newElementsSnapshot[firstFoundElement.id] = newElement
-        addNewHistory(newElementsSnapshot)
+        commitNewSnapshot({
+          mode: 'modifyElement',
+          modifiedElement: { ...firstFoundTextElement, isWriting: true },
+        })
         return
       }
       // not found any existing element, go to creating mode
-      else if (!firstFoundElement) {
-        setActionState({
-          action: 'creating',
+      else if (!firstFoundTextElement) {
+        setUiState({
+          state: 'creating',
           data: { textareaX1: sceneX, textareaY1: sceneY, textareaWidth: 0, textareaHeight: 0 },
         })
-        const nextIndex = elementsSnapshot.length
-        const newElement: TElementData = {
-          type: 'text',
-          id: nextIndex,
-          isWriting: true,
-          lines: [],
-        }
-        const newElementsSnapshot = [...elementsSnapshot, newElement]
-        addNewHistory(newElementsSnapshot)
         return
       }
     }
     // the textarea is currently being displayed in creating mode
-    else if (actionState.action === 'creating') {
+    // this click is for finishing writing
+    else if (uiState.state === 'creating') {
       const content = (textareaRef.current?.value ?? '').trim()
 
       if (!content) {
-        // remove latest history and close textarea
-        // TODO: implement removeLastHistory instead of undo hack
-        undoHistory()
-        setActionState({ action: 'none' })
+        // no text is actually created, do nothing with history and close the textarea
+        setUiState({ state: 'none' })
         return
       }
 
-      const lastIndex = elementsSnapshot.length - 1
-      const newElement: TElementData = createTextElement({
-        id: lastIndex,
+      const newElementWithoutId = createTextElementWithoutId({
         canvasForMeasure: canvasForMeasureRef.current,
         content,
-        x1: actionState.data.textareaX1,
-        y1: actionState.data.textareaY1,
+        x1: uiState.data.textareaX1,
+        y1: uiState.data.textareaY1,
         isWriting: false,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[lastIndex] = newElement
-      // update current history and close textarea
-      replaceCurrentHistory(newElementsSnapshot)
-      setActionState({ action: 'none' })
+      commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+      setUiState({ state: 'none' })
       return
     }
     // the textarea is currently being displayed in updating mode
-    else if (actionState.action === 'updating') {
+    // this click is for finishing writing
+    else if (uiState.state === 'updating') {
       const newContent = (textareaRef.current?.value ?? '').trim()
 
-      if (newContent === actionState.data.content) {
-        // remove latest history and close textarea
-        // TODO: fix this undo hack
-        undoHistory()
-        setActionState({ action: 'none' })
-        return
-      }
       if (!newContent) {
-        // remove text element from current history and close textarea
-        const newElementsSnapshot = elementsSnapshot.map((element) => {
-          if (element.id === actionState.data.id) {
-            return { type: 'removed', id: element.id } as const
-          } else {
-            return element
-          }
-        })
-        replaceCurrentHistory(newElementsSnapshot)
-        setActionState({ action: 'none' })
+        replaceCurrentSnapshot({ replacedElement: { id: uiState.data.elementId, type: 'removed' } })
+        setUiState({ state: 'none' })
         return
       }
 
-      const updatingIndex = actionState.data.id
-      const newElement: TElementData = createTextElement({
-        id: updatingIndex,
+      const newElementWithoutId = createTextElementWithoutId({
         canvasForMeasure: canvasForMeasureRef.current,
         content: newContent,
-        x1: actionState.data.textareaX1,
-        y1: actionState.data.textareaY1,
+        x1: uiState.data.textareaX1,
+        y1: uiState.data.textareaY1,
         isWriting: false,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[updatingIndex] = newElement
-      replaceCurrentHistory(newElementsSnapshot)
-      setActionState({ action: 'none' })
+      replaceCurrentSnapshot({
+        replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
+      })
+      setUiState({ state: 'none' })
       return
     }
   }
@@ -301,24 +266,24 @@ export function CanvasForText({
         For measure text
       </canvas>
 
-      {actionState.action === 'creating' ? (
+      {uiState.state === 'creating' ? (
         <textarea
           style={{
             display: 'block',
             position: 'fixed',
             top: sceneCoordsToViewportCoords({
-              sceneX: actionState.data.textareaX1,
-              sceneY: actionState.data.textareaY1,
+              sceneX: uiState.data.textareaX1,
+              sceneY: uiState.data.textareaY1,
             }).viewportY,
             left: sceneCoordsToViewportCoords({
-              sceneX: actionState.data.textareaX1,
-              sceneY: actionState.data.textareaY1,
+              sceneX: uiState.data.textareaX1,
+              sceneY: uiState.data.textareaY1,
             }).viewportX,
             // TODO: convert sceneHeight -> viewportHeight
-            height: actionState.data.textareaHeight,
+            height: uiState.data.textareaHeight,
             minHeight: '2rem',
             // TODO: convert sceneWidth -> viewportWidth
-            width: actionState.data.textareaWidth,
+            width: uiState.data.textareaWidth,
             minWidth: '2rem',
             fontFamily: 'Nanum Pen Script',
             // TODO: scale fontSize based on zoomLevel
@@ -335,8 +300,8 @@ export function CanvasForText({
           autoFocus
           ref={textareaRef}
           onChange={(e) => {
-            setActionState((prev) => {
-              if (prev.action === 'creating') {
+            setUiState((prev) => {
+              if (prev.state === 'creating') {
                 return {
                   ...prev,
                   data: {
@@ -351,24 +316,25 @@ export function CanvasForText({
           }}
         />
       ) : null}
-      {actionState.action === 'updating' ? (
+
+      {uiState.state === 'updating' ? (
         <textarea
           style={{
             display: 'block',
             position: 'fixed',
             top: sceneCoordsToViewportCoords({
-              sceneX: actionState.data.textareaX1,
-              sceneY: actionState.data.textareaY1,
+              sceneX: uiState.data.textareaX1,
+              sceneY: uiState.data.textareaY1,
             }).viewportY,
             left: sceneCoordsToViewportCoords({
-              sceneX: actionState.data.textareaX1,
-              sceneY: actionState.data.textareaY1,
+              sceneX: uiState.data.textareaX1,
+              sceneY: uiState.data.textareaY1,
             }).viewportX,
             // TODO: convert sceneHeight -> viewportHeight
-            height: actionState.data.textareaHeight,
+            height: uiState.data.textareaHeight,
             minHeight: '2rem',
             // TODO: convert sceneWidth -> viewportWidth
-            width: actionState.data.textareaWidth,
+            width: uiState.data.textareaWidth,
             minWidth: '2rem',
             fontFamily: 'Nanum Pen Script',
             // TODO: scale fontSize based on zoomLevel
@@ -385,8 +351,8 @@ export function CanvasForText({
           autoFocus
           ref={textareaRef}
           onChange={(e) => {
-            setActionState((prev) => {
-              if (prev.action === 'updating') {
+            setUiState((prev) => {
+              if (prev.state === 'updating') {
                 return {
                   ...prev,
                   data: {
@@ -399,9 +365,23 @@ export function CanvasForText({
               return prev
             })
           }}
-          defaultValue={actionState.data.content}
+          defaultValue={uiState.data.content}
+          onBlur={() => {
+            // keep state untouched, just make sure `isWriting` is always `true` after blur
+            if (uiState.state === 'updating') {
+              const editingElement = elementsSnapshot[uiState.data.elementId]
+              if (!editingElement || editingElement.type !== 'text') {
+                throw new Error(
+                  'The editing element is missing in the current history or not a "text" element'
+                )
+              }
+              replaceCurrentSnapshot({ replacedElement: { ...editingElement, isWriting: false } })
+              return
+            }
+          }}
         />
       ) : null}
+
       {renderCanvas({
         onPointerMove: handlePointerMove,
         onClick: handleClick,
