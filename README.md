@@ -17,11 +17,13 @@ https://user-images.githubusercontent.com/19894957/162615690-898918b9-1de6-4418-
 - [x] Undo/Redo/Clear
 - [x] Text tool
 - [x] Support deleting a selected element
-- [ ] Arrow drawing tool
+- [x] Arrow drawing tool
   - https://stackoverflow.com/a/26806316
   - https://codesandbox.io/s/magical-feynman-mtuziv?file=/src/index.js
 - [x] Pan feature
 - [x] Zoom feature
+- [ ] CSS & Styling
+- [ ] Rotate feature
 - [ ] Support uploading an image
 - [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
