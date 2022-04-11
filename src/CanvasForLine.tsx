@@ -1,25 +1,28 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import { TElementData, TSnapshot } from './App'
+import {
+  TCommitNewSnapshotParam,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './App'
 
 const generator = rough.generator()
 
-export function createLineElement({
-  id,
+export function createLineElementWithoutId({
   x1,
   y1,
   x2,
   y2,
 }: {
-  id: number
   x1: number
   y1: number
   x2: number
   y2: number
-}): Extract<TElementData, { type: 'line' | 'rectangle' }> {
+}): Omit<Extract<TElementData, { type: 'line' | 'rectangle' }>, 'id'> {
   const roughElement = generator.line(x1, y1, x2, y2)
-  return { id: id, x1: x1, y1: y1, x2: x2, y2: y2, type: 'line', roughElement }
+  return { x1: x1, y1: y1, x2: x2, y2: y2, type: 'line', roughElement }
 }
 
 /**
@@ -30,8 +33,8 @@ export function createLineElement({
 export function CanvasForLine({
   renderCanvas,
   elementsSnapshot,
-  addNewHistory,
-  replaceCurrentHistory,
+  commitNewSnapshot,
+  replaceCurrentSnapshot,
   viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
@@ -40,68 +43,91 @@ export function CanvasForLine({
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
-  addNewHistory: (arg: TSnapshot) => void
-  replaceCurrentHistory: (arg: TSnapshot) => void
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
+  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
 }) {
-  const [action, setAction] = useState<'none' | 'drawing'>('none')
+  const [uiState, setUiState] = useState<
+    | { state: 'none' }
+    | { state: 'initDraw'; data: { pointerDownAtX: number; pointerDownAtY: number } }
+    | { state: 'drawing'; data: { elementId: number } }
+  >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (action === 'none') {
+    // should come from onPointerUp() or initial state when mount
+    if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      const nextIndex = elementsSnapshot.length
-      const newElement = createLineElement({
-        id: nextIndex,
-        x1: sceneX,
-        y1: sceneY,
-        x2: sceneX,
-        y2: sceneY,
+      setUiState({
+        state: 'initDraw',
+        data: { pointerDownAtX: sceneX, pointerDownAtY: sceneY },
       })
-      const newElementsSnapshot = [...elementsSnapshot, newElement]
-      addNewHistory(newElementsSnapshot)
-      setAction('drawing')
       return
     }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (action === 'drawing') {
+    // should come from onPointerDown()
+    if (uiState.state === 'initDraw') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      // replace last element
-      const lastIndex = elementsSnapshot.length - 1
-      const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'line') {
-        throw new Error('The last element in the current snapshot is not a "line" type')
-      }
-      const { x1: currentX1, y1: currentY1 } = lastElement
-      const newElement = createLineElement({
-        id: lastIndex,
-        x1: currentX1,
-        y1: currentY1,
+      const newElementWithoutId = createLineElementWithoutId({
+        x1: uiState.data.pointerDownAtX,
+        y1: uiState.data.pointerDownAtY,
         x2: sceneX,
         y2: sceneY,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[lastIndex] = newElement
-
-      replaceCurrentHistory(newElementsSnapshot)
+      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+      if (newId === undefined) {
+        throw new Error('ID of the drawing line element is missing')
+      }
+      setUiState({ state: 'drawing', data: { elementId: newId } })
+      return
+    }
+    // should come from previous onPointerMove()
+    if (uiState.state === 'drawing') {
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
+      // replace the drawing element
+      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      if (!drawingElement || drawingElement.type !== 'line') {
+        throw new Error(
+          'The drawing element in the current snapshot is missing or not a "line" element'
+        )
+      }
+      const { x1, y1 } = drawingElement
+      const newElementWithoutId = createLineElementWithoutId({
+        x1,
+        y1,
+        x2: sceneX,
+        y2: sceneY,
+      })
+      replaceCurrentSnapshot({
+        replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
+      })
       return
     }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    if (action === 'drawing') {
-      // clear action
-      setAction('none')
+    // should come from onPointerDown()
+    if (uiState.state === 'initDraw') {
+      // no drawing occurs, do nothing with history
+      setUiState({ state: 'none' })
+      return
+    }
+    // should come from onPointerMove()
+    if (uiState.state === 'drawing') {
+      setUiState({ state: 'none' })
       return
     }
   }

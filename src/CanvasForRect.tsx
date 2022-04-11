@@ -1,26 +1,28 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import { TElementData, TSnapshot } from './App'
+import {
+  TCommitNewSnapshotParam,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './App'
 
 const generator = rough.generator()
 
-export function createRectangleElement({
-  id,
+export function createRectangleElementWithoutId({
   x1,
   y1,
   width,
   height,
 }: {
-  id: number
   x1: number
   y1: number
   width: number
   height: number
-}): Extract<TElementData, { type: 'line' | 'rectangle' }> {
+}): Omit<Extract<TElementData, { type: 'line' | 'rectangle' }>, 'id'> {
   const roughElement = generator.rectangle(x1, y1, width, height)
   return {
-    id: id,
     x1: x1,
     y1: y1,
     x2: x1 + width,
@@ -50,8 +52,8 @@ export function adjustRectangleCoordinates(
 export function CanvasForRect({
   renderCanvas,
   elementsSnapshot,
-  addNewHistory,
-  replaceCurrentHistory,
+  commitNewSnapshot,
+  replaceCurrentSnapshot,
   viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
@@ -60,87 +62,107 @@ export function CanvasForRect({
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
   elementsSnapshot: TSnapshot
-  addNewHistory: (arg: TSnapshot) => void
-  replaceCurrentHistory: (arg: TSnapshot) => void
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
 }) {
-  const [action, setAction] = useState<'none' | 'drawing'>('none')
+  const [uiState, setUiState] = useState<
+    | { state: 'none' }
+    | { state: 'initDraw'; data: { pointerDownAtX: number; pointerDownAtY: number } }
+    | { state: 'drawing'; data: { elementId: number } }
+  >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
-    if (action === 'none') {
+    // should come from onPointerUp() or initial state when mount
+    if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      const nextIndex = elementsSnapshot.length
-      const newElement = createRectangleElement({
-        id: nextIndex,
-        x1: sceneX,
-        y1: sceneY,
-        width: 0,
-        height: 0,
-      })
-      const newElementsSnapshot = [...elementsSnapshot, newElement]
-      addNewHistory(newElementsSnapshot)
-      setAction('drawing')
+
+      setUiState({ state: 'initDraw', data: { pointerDownAtX: sceneX, pointerDownAtY: sceneY } })
       return
     }
   }
 
   function handlePointerMove(e: React.PointerEvent) {
-    if (action === 'drawing') {
+    // should come from onPointerDown()
+    if (uiState.state === 'initDraw') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
         viewportY: e.clientY,
       })
-      // replace last element
-      const lastIndex = elementsSnapshot.length - 1
-      const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'rectangle') {
-        throw new Error('The last element in the current snapshot is not a "rectangle" type')
-      }
-      const { x1: currentX1, y1: currentY1 } = lastElement
-      const newElement = createRectangleElement({
-        id: lastIndex,
-        x1: currentX1,
-        y1: currentY1,
-        width: sceneX - currentX1,
-        height: sceneY - currentY1,
+      const newElementWithoutId = createRectangleElementWithoutId({
+        x1: uiState.data.pointerDownAtX,
+        y1: uiState.data.pointerDownAtY,
+        width: sceneX - uiState.data.pointerDownAtX,
+        height: sceneY - uiState.data.pointerDownAtY,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[lastIndex] = newElement
+      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+      if (newId === undefined) {
+        throw new Error('ID of the drawing rectangle element is missing')
+      }
+      setUiState({ state: 'drawing', data: { elementId: newId } })
+      return
+    }
+    // should come from previous onPointerMove()
+    if (uiState.state === 'drawing') {
+      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+        viewportX: e.clientX,
+        viewportY: e.clientY,
+      })
+      // replace the drawing element
+      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      if (!drawingElement || drawingElement.type !== 'rectangle') {
+        throw new Error(
+          'The drawing element in the current snapshot is missing or not a "rectangle" element'
+        )
+      }
+      const { x1, y1 } = drawingElement
+      const newElementWithoutId = createRectangleElementWithoutId({
+        x1,
+        y1,
+        width: sceneX - x1,
+        height: sceneY - y1,
+      })
 
-      replaceCurrentHistory(newElementsSnapshot)
+      replaceCurrentSnapshot({
+        replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
+      })
       return
     }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    if (action === 'drawing') {
+    // should come from onPointerDown()
+    if (uiState.state === 'initDraw') {
+      // no drawing occurs, do nothing with history
+      setUiState({ state: 'none' })
+      return
+    }
+    // should come from onPointerMove()
+    if (uiState.state === 'drawing') {
       // adjust coord when finish drawing
-      const lastIndex = elementsSnapshot.length - 1
-      const lastElement = elementsSnapshot[lastIndex]
-      if (lastElement.type !== 'rectangle') {
-        throw new Error('The last element in the current snapshot is not a "rectangle" type')
+      const drawnElement = elementsSnapshot[uiState.data.elementId]
+      if (!drawnElement || drawnElement.type !== 'rectangle') {
+        throw new Error(
+          'The finishing drawing element in the current snapshot is missing or not a "rectangle" element'
+        )
       }
-      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(lastElement)
-      const newElement = createRectangleElement({
-        id: lastIndex,
+      const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(drawnElement)
+      const newElementWithoutId = createRectangleElementWithoutId({
         x1: newX1,
         y1: newY1,
         width: newX2 - newX1,
         height: newY2 - newY1,
       })
-      const newElementsSnapshot = [...elementsSnapshot]
-      newElementsSnapshot[lastIndex] = newElement
-
-      replaceCurrentHistory(newElementsSnapshot)
-
-      // clear action
-      setAction('none')
+      replaceCurrentSnapshot({
+        replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
+      })
+      setUiState({ state: 'none' })
       return
     }
   }

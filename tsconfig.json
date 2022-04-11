@@ -14,9 +14,9 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
-    "jsx": "react-jsx"
+    "jsx": "react-jsx",
     // My custom rules
-    // "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true
   },
   "include": ["src"]
 }

@@ -43,16 +43,69 @@ export type TElementData =
 
 export type TSnapshot = TElementData[]
 
+type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never
+
+export type TCommitNewSnapshotParam =
+  | { mode: 'clone' }
+  | { mode: 'addElement'; newElementWithoutId: DistributiveOmit<TElementData, 'id'> }
+  | { mode: 'removeElement'; elementId: number }
+  | { mode: 'removeAllElement' }
+  | { mode: 'modifyElement'; modifiedElement: TElementData }
+export type TReplaceCurrentSnapshotParam = { replacedElement: TElementData }
+
 function useHistory() {
   const [history, setHistory] = useState<TSnapshot[]>([[]])
   const [currentIndex, setCurrentIndex] = useState(0)
-
-  function addNewHistory(newSnapshot: TSnapshot) {
-    setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex + 1), newSnapshot])
-    setCurrentIndex((prev) => prev + 1)
+  const currentSnapshot = history[currentIndex]
+  if (!currentSnapshot) {
+    throw new Error('The whole current snapshot is not exist in this point of history!!')
   }
 
-  function replaceCurrentHistory(newSnapshot: TSnapshot) {
+  function commitNewSnapshot(options: TCommitNewSnapshotParam) {
+    if (!currentSnapshot) {
+      throw new Error('The whole current snapshot is not exist in this point of history!!')
+    }
+    let newSnapshot: TSnapshot
+    if (options.mode === 'clone') {
+      newSnapshot = [...currentSnapshot]
+    } else if (options.mode === 'addElement') {
+      const newElement = {
+        ...options.newElementWithoutId,
+        id: currentSnapshot.length,
+      }
+      newSnapshot = [...currentSnapshot, newElement]
+    } else if (options.mode === 'removeElement') {
+      const removedElement = {
+        id: options.elementId,
+        type: 'removed',
+      } as const
+      newSnapshot = [...currentSnapshot]
+      newSnapshot[options.elementId] = removedElement
+    } else if (options.mode === 'removeAllElement') {
+      newSnapshot = []
+    } else if (options.mode === 'modifyElement') {
+      newSnapshot = [...currentSnapshot]
+      newSnapshot[options.modifiedElement.id] = { ...options.modifiedElement }
+    }
+    setHistory((prevHistory) => {
+      const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
+      setCurrentIndex(newHistory.length - 1)
+      return newHistory
+    })
+
+    // for "addElement" mode, we also return new element's id
+    if (options.mode === 'addElement') {
+      return currentSnapshot.length
+    }
+    return
+  }
+
+  function replaceCurrentSnapshot({ replacedElement: newElement }: TReplaceCurrentSnapshotParam) {
+    if (!currentSnapshot) {
+      throw new Error('The whole current snapshot is not exist in this point of history!!')
+    }
+    const newSnapshot = [...currentSnapshot]
+    newSnapshot[newElement.id] = { ...newElement }
     setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
   }
 
@@ -69,9 +122,9 @@ function useHistory() {
   }
 
   return {
-    elementsSnapshot: history[currentIndex],
-    addNewHistory,
-    replaceCurrentHistory,
+    elementsSnapshot: currentSnapshot,
+    commitNewSnapshot,
+    replaceCurrentSnapshot,
     undo,
     redo,
   }
@@ -83,10 +136,12 @@ export function getSvgPathFromStroke(stroke: number[][]) {
 
   const d = stroke.reduce(
     (acc, [x0, y0], i, arr) => {
+      // @ts-expect-error: noUncheckedIndexedAccess
       const [x1, y1] = arr[(i + 1) % arr.length]
       acc.push(x0, y0, (x0 + x1) / 2, (y0 + y1) / 2)
       return acc
     },
+    // @ts-expect-error: noUncheckedIndexedAccess
     ['M', ...stroke[0], 'Q']
   )
 
@@ -98,7 +153,7 @@ export function App() {
   const [tool, setTool] = useState<'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand'>(
     'selection'
   )
-  const { elementsSnapshot, addNewHistory, replaceCurrentHistory, undo, redo } = useHistory()
+  const { elementsSnapshot, commitNewSnapshot, replaceCurrentSnapshot, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
@@ -110,7 +165,7 @@ export function App() {
   function handleClickClear() {
     if (!canvasRef.current) return
 
-    addNewHistory([])
+    commitNewSnapshot({ mode: 'removeAllElement' })
   }
 
   // * ------------ Canvas Drawing ------------
@@ -152,11 +207,9 @@ export function App() {
           context.textBaseline = 'top'
           context.font = '1.5rem "Nanum Pen Script"'
           for (let i = 0; i < element.lines.length; i++) {
-            context.fillText(
-              element.lines[i].lineContent,
-              element.lines[i].lineX1,
-              element.lines[i].lineY1
-            )
+            const line = element.lines[i]
+            if (!line) continue
+            context.fillText(line.lineContent, line.lineX1, line.lineY1)
           }
         } else if (element.type === 'removed') {
           // don't draw
@@ -402,8 +455,8 @@ export function App() {
               <CanvasForSelection
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
-                addNewHistory={addNewHistory}
-                replaceCurrentHistory={replaceCurrentHistory}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 drawScene={drawScene}
               />
@@ -413,8 +466,8 @@ export function App() {
               <CanvasForRect
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
-                addNewHistory={addNewHistory}
-                replaceCurrentHistory={replaceCurrentHistory}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
@@ -423,8 +476,8 @@ export function App() {
               <CanvasForLine
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
-                addNewHistory={addNewHistory}
-                replaceCurrentHistory={replaceCurrentHistory}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
@@ -433,8 +486,8 @@ export function App() {
               <CanvasForPencil
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
-                addNewHistory={addNewHistory}
-                replaceCurrentHistory={replaceCurrentHistory}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
@@ -443,9 +496,8 @@ export function App() {
               <CanvasForText
                 renderCanvas={renderCanvas}
                 elementsSnapshot={elementsSnapshot}
-                addNewHistory={addNewHistory}
-                replaceCurrentHistory={replaceCurrentHistory}
-                undoHistory={undo}
+                commitNewSnapshot={commitNewSnapshot}
+                replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
               />
