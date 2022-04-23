@@ -1,0 +1,20 @@
+.radioInput {
+  appearance: none;
+}
+
+.radioInput:checked + .radioLabel {
+  background-color: #bae6fd;
+  border: 1px dashed black;
+}
+
+.radioInput:focus-visible + .radioLabel {
+  outline: 1px solid blue;
+}
+
+.radioLabel {
+  display: inline-block;
+}
+
+.radioLabel img {
+  vertical-align: bottom;
+}

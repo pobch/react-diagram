@@ -12,6 +12,7 @@ import {
 import { createTextElementWithoutId, getTextElementAtPosition } from './CanvasForText'
 import rough from 'roughjs/bundled/rough.esm'
 import getStroke from 'perfect-freehand'
+import { CmdButton } from './CmdButton'
 
 function getFirstElementAtPosition({
   elementsSnapshot,
@@ -918,8 +919,8 @@ export function CanvasForSelection({
 
       {/* floating delete button at top-left of the screen */}
       {uiState.state === 'idleSelecting' ? (
-        <div style={{ position: 'fixed', top: '1.5rem', left: '0.5rem' }}>
-          <button onClick={handleClickDeleteElement}>X</button>
+        <div style={{ position: 'fixed', top: '45vh', left: '0.5rem' }}>
+          <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />
         </div>
       ) : null}
 

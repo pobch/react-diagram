@@ -8,6 +8,8 @@ import { CanvasForPencil } from './CanvasForPencil'
 import getStroke from 'perfect-freehand'
 import { CanvasForText } from './CanvasForText'
 import { CanvasForHand } from './CanvasForHand'
+import { ToolRadio } from './ToolRadio'
+import { CmdButton } from './CmdButton'
 
 export type TElementData =
   | {
@@ -149,10 +151,15 @@ export function getSvgPathFromStroke(stroke: number[][]) {
   return d.join(' ')
 }
 
+/**
+ * * ---------------------------------------
+ * *            Component
+ * * ---------------------------------------
+ */
+export type TTool = 'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand' | 'arrow'
+
 export function App() {
-  const [tool, setTool] = useState<
-    'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'hand' | 'arrow'
-  >('selection')
+  const [tool, setTool] = useState<TTool>('selection')
   const { elementsSnapshot, commitNewSnapshot, replaceCurrentSnapshot, undo, redo } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
@@ -162,7 +169,7 @@ export function App() {
 
   // * ----------- Clear Canvas -------------
 
-  function handleClickClear() {
+  function handleClickClearCanvas() {
     if (!canvasRef.current) return
 
     commitNewSnapshot({ mode: 'removeAllElement' })
@@ -358,104 +365,57 @@ export function App() {
         style={{
           position: 'fixed',
           top: 0,
-          left: '1.5rem',
+          left: 0,
           margin: '0.5rem',
           padding: '0.25rem',
+          backgroundColor: 'white',
         }}
       >
         <legend>Tool</legend>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="selection"
-            checked={tool === 'selection'}
-            onChange={() => setTool('selection')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="selection">Selection</label>
+          <ToolRadio toolName="selection" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="line"
-            checked={tool === 'line'}
-            onChange={() => setTool('line')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="line">Line</label>
+          <ToolRadio toolName="line" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="rectangle"
-            checked={tool === 'rectangle'}
-            onChange={() => setTool('rectangle')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="rectangle">Rectangle</label>
+          <ToolRadio toolName="rectangle" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="pencil"
-            checked={tool === 'pencil'}
-            onChange={() => setTool('pencil')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="pencil">Pencil</label>
+          <ToolRadio toolName="pencil" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="text"
-            checked={tool === 'text'}
-            onChange={() => setTool('text')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="text">Text</label>
+          <ToolRadio toolName="text" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="hand"
-            checked={tool === 'hand'}
-            onChange={() => setTool('hand')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="hand">Hand</label>
+          <ToolRadio toolName="hand" currentTool={tool} setCurrentTool={setTool} />
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <input
-            type="radio"
-            id="arrow"
-            checked={tool === 'arrow'}
-            onChange={() => setTool('arrow')}
-            style={{ marginInlineEnd: '0.25rem' }}
-          />
-          <label htmlFor="arrow">Arrow</label>
+          <ToolRadio toolName="arrow" currentTool={tool} setCurrentTool={setTool} />
         </span>
       </fieldset>
+
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <button onClick={() => undo()}>Undo</button>
+          <CmdButton cmdName="undo" onClick={() => undo()} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={() => redo()}>Redo</button>
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={handleClickClear}>Clear</button>
+          <CmdButton cmdName="redo" onClick={() => redo()} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={handleClickZoomOut}>Zoom Out</button>
+          <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={handleClickResetPanZoom}>Reset</button>
+          <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
-          <button onClick={handleClickZoomIn}>Zoom In</button>
+          <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
         </span>
       </div>
 
