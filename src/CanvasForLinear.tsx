@@ -25,6 +25,7 @@ function createLineElementWithoutId({
   return { x1: x1, y1: y1, x2: x2, y2: y2, type: 'line', roughElements: [roughElement] }
 }
 
+// https://stackoverflow.com/a/26806316
 function createArrowElementWithoutId({
   x1,
   y1,
