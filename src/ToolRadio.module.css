@@ -1,6 +1,19 @@
+/* Base styling */
+
 .radioInput {
   appearance: none;
 }
+
+.radioLabel {
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.radioLabel img {
+  vertical-align: bottom;
+}
+
+/* State styling */
 
 .radioInput:checked + .radioLabel {
   background-color: #bae6fd;
@@ -9,12 +22,4 @@
 
 .radioInput:focus-visible + .radioLabel {
   outline: 1px solid blue;
-}
-
-.radioLabel {
-  display: inline-block;
-}
-
-.radioLabel img {
-  vertical-align: bottom;
 }
