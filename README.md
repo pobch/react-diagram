@@ -8,7 +8,7 @@ https://react-diagram.netlify.app/
 
 ## Features
 
-https://user-images.githubusercontent.com/19894957/162615690-898918b9-1de6-4418-b664-1274711bbaa6.mp4
+https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-8403-6d4d94d4011f.mp4
 
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
