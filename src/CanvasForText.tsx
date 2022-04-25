@@ -5,6 +5,7 @@ import {
   TReplaceCurrentSnapshotParam,
   TSnapshot,
 } from './App'
+import { CmdButton } from './CmdButton'
 
 export function getTextElementAtPosition({
   elementsSnapshot,
@@ -86,6 +87,7 @@ export function CanvasForText({
   replaceCurrentSnapshot,
   viewportCoordsToSceneCoords,
   sceneCoordsToViewportCoords,
+  zoomLevel,
 }: {
   renderCanvas: (arg: {
     onPointerMove: (e: React.PointerEvent) => void
@@ -103,6 +105,7 @@ export function CanvasForText({
     viewportX: number
     viewportY: number
   }
+  zoomLevel: number
 }) {
   const [uiState, setUiState] = useState<
     | { state: 'none' }
@@ -172,22 +175,33 @@ export function CanvasForText({
         xPosition: sceneX,
         yPosition: sceneY,
       })
+
       // found an existing text element, go to updating mode
       if (firstFoundTextElement && firstFoundTextElement.type === 'text') {
+        // TODO: remove magic number '8'
+        const maxSceneLineWidth =
+          8 +
+          firstFoundTextElement.lines.reduce((prev, curr) => {
+            return Math.max(prev, curr.lineWidth)
+          }, 0)
+        // TODO: remove magic number '16'
+        const sceneContentHeight =
+          16 +
+          firstFoundTextElement.lines.reduce((prev, curr) => {
+            return prev + curr.lineHeight
+          }, 0)
+
+        // initialize a floating textarea
         setUiState({
           state: 'updating',
           data: {
             elementId: firstFoundTextElement.id,
             textareaX1: firstFoundTextElement.lines[0]?.lineX1 ?? sceneX,
             textareaY1: firstFoundTextElement.lines[0]?.lineY1 ?? sceneY,
-            textareaWidth: firstFoundTextElement.lines.reduce((prev, curr) => {
-              // TODO: remove magic number '8'
-              return Math.max(curr.lineWidth + 8, prev)
-            }, 0),
-            textareaHeight: firstFoundTextElement.lines.reduce((prev, curr) => {
-              return prev + curr.lineHeight
-              // TODO: remove magic number '16'
-            }, 16),
+            // TODO: create a helper function to convert sceneWidth -> viewportWidth
+            textareaWidth: zoomLevel * maxSceneLineWidth,
+            // TODO: create a helper function to convert sceneHeight -> viewportHeight
+            textareaHeight: zoomLevel * sceneContentHeight,
             content: firstFoundTextElement.lines.map(({ lineContent }) => lineContent).join('\n'),
           },
         })
@@ -197,8 +211,10 @@ export function CanvasForText({
         })
         return
       }
+
       // not found any existing element, go to creating mode
       else if (!firstFoundTextElement) {
+        // initialize a floating textarea
         setUiState({
           state: 'creating',
           data: { textareaX1: sceneX, textareaY1: sceneY, textareaWidth: 0, textareaHeight: 0 },
@@ -206,7 +222,7 @@ export function CanvasForText({
         return
       }
     }
-    // the textarea is currently being displayed in creating mode
+    // the floating textarea is currently being displayed in creating mode
     // this click is for finishing writing
     else if (uiState.state === 'creating') {
       const content = (textareaRef.current?.value ?? '').trim()
@@ -228,7 +244,7 @@ export function CanvasForText({
       setUiState({ state: 'none' })
       return
     }
-    // the textarea is currently being displayed in updating mode
+    // the floating textarea is currently being displayed in updating mode
     // this click is for finishing writing
     else if (uiState.state === 'updating') {
       const newContent = (textareaRef.current?.value ?? '').trim()
@@ -266,10 +282,13 @@ export function CanvasForText({
         For measure text
       </canvas>
 
-      {uiState.state === 'creating' ? (
-        <textarea
-          style={{
-            display: 'block',
+      {(() => {
+        // Styling for a floating textarea
+        let styledFloatingWrapper: React.CSSProperties | undefined
+        let styledTextArea: React.CSSProperties | undefined
+        let styledButtonWrapper: React.CSSProperties | undefined
+        if (uiState.state === 'creating' || uiState.state === 'updating') {
+          styledFloatingWrapper = {
             position: 'fixed',
             top: sceneCoordsToViewportCoords({
               sceneX: uiState.data.textareaX1,
@@ -279,15 +298,16 @@ export function CanvasForText({
               sceneX: uiState.data.textareaX1,
               sceneY: uiState.data.textareaY1,
             }).viewportX,
-            // TODO: convert sceneHeight -> viewportHeight
+          }
+          styledTextArea = {
+            display: 'block',
             height: uiState.data.textareaHeight,
-            minHeight: '2rem',
-            // TODO: convert sceneWidth -> viewportWidth
+            minHeight: '2em',
             width: uiState.data.textareaWidth,
-            minWidth: '2rem',
+            minWidth: '2em',
             fontFamily: 'Nanum Pen Script',
-            // TODO: scale fontSize based on zoomLevel
-            fontSize: '1.5rem',
+            // scale fontSize based on zoomLevel
+            fontSize: `${(1.5 * zoomLevel).toFixed(3)}rem`,
             // TODO: fix this magic number
             lineHeight: 0.8,
             whiteSpace: 'pre',
@@ -296,91 +316,89 @@ export function CanvasForText({
             border: 'none',
             overflow: 'hidden',
             resize: 'none',
-          }}
-          autoFocus
-          ref={textareaRef}
-          onChange={(e) => {
-            setUiState((prev) => {
-              if (prev.state === 'creating') {
-                return {
-                  ...prev,
-                  data: {
-                    ...prev.data,
-                    textareaWidth: e.target.scrollWidth,
-                    textareaHeight: e.target.scrollHeight,
-                  },
-                }
-              }
-              return prev
-            })
-          }}
-        />
-      ) : null}
+          }
+          styledButtonWrapper = { position: 'absolute', top: 0, left: '-1.5rem' }
+        }
 
-      {uiState.state === 'updating' ? (
-        <textarea
-          style={{
-            display: 'block',
-            position: 'fixed',
-            top: sceneCoordsToViewportCoords({
-              sceneX: uiState.data.textareaX1,
-              sceneY: uiState.data.textareaY1,
-            }).viewportY,
-            left: sceneCoordsToViewportCoords({
-              sceneX: uiState.data.textareaX1,
-              sceneY: uiState.data.textareaY1,
-            }).viewportX,
-            // TODO: convert sceneHeight -> viewportHeight
-            height: uiState.data.textareaHeight,
-            minHeight: '2rem',
-            // TODO: convert sceneWidth -> viewportWidth
-            width: uiState.data.textareaWidth,
-            minWidth: '2rem',
-            fontFamily: 'Nanum Pen Script',
-            // TODO: scale fontSize based on zoomLevel
-            fontSize: '1.5rem',
-            // TODO: fix this magic number
-            lineHeight: 0.8,
-            whiteSpace: 'pre',
-            background: 'transparent',
-            outline: 'none',
-            border: 'none',
-            overflow: 'hidden',
-            resize: 'none',
-          }}
-          autoFocus
-          ref={textareaRef}
-          onChange={(e) => {
-            setUiState((prev) => {
-              if (prev.state === 'updating') {
-                return {
-                  ...prev,
-                  data: {
-                    ...prev.data,
-                    textareaWidth: e.target.scrollWidth,
-                    textareaHeight: e.target.scrollHeight,
-                  },
-                }
-              }
-              return prev
-            })
-          }}
-          defaultValue={uiState.data.content}
-          onBlur={() => {
-            // keep state untouched, just make sure `isWriting` is always `true` after blur
-            if (uiState.state === 'updating') {
-              const editingElement = elementsSnapshot[uiState.data.elementId]
-              if (!editingElement || editingElement.type !== 'text') {
-                throw new Error(
-                  'The editing element is missing in the current history or not a "text" element'
-                )
-              }
-              replaceCurrentSnapshot({ replacedElement: { ...editingElement, isWriting: false } })
-              return
-            }
-          }}
-        />
-      ) : null}
+        switch (uiState.state) {
+          case 'creating':
+            return (
+              <div style={styledFloatingWrapper}>
+                <textarea
+                  style={styledTextArea}
+                  autoFocus
+                  ref={textareaRef}
+                  onChange={(e) => {
+                    setUiState((prev) => {
+                      if (prev.state === 'creating') {
+                        return {
+                          ...prev,
+                          data: {
+                            ...prev.data,
+                            // already taking zoomLevel into account
+                            textareaWidth: e.target.scrollWidth,
+                            textareaHeight: e.target.scrollHeight,
+                          },
+                        }
+                      }
+                      return prev
+                    })
+                  }}
+                />
+                <div style={styledButtonWrapper}>
+                  <CmdButton cmdName="doneEditingText" onClick={handleClick} iconWidth={16} />
+                </div>
+              </div>
+            )
+          case 'updating':
+            return (
+              <div style={styledFloatingWrapper}>
+                <textarea
+                  style={styledTextArea}
+                  autoFocus
+                  ref={textareaRef}
+                  onChange={(e) => {
+                    setUiState((prev) => {
+                      if (prev.state === 'updating') {
+                        return {
+                          ...prev,
+                          data: {
+                            ...prev.data,
+                            // already taking zoomLevel into account
+                            textareaWidth: e.target.scrollWidth,
+                            textareaHeight: e.target.scrollHeight,
+                          },
+                        }
+                      }
+                      return prev
+                    })
+                  }}
+                  defaultValue={uiState.data.content}
+                  onBlur={() => {
+                    // keep state untouched, just make sure `isWriting` is always `true` after blur
+                    if (uiState.state === 'updating') {
+                      const editingElement = elementsSnapshot[uiState.data.elementId]
+                      if (!editingElement || editingElement.type !== 'text') {
+                        throw new Error(
+                          'The editing element is missing in the current history or not a "text" element'
+                        )
+                      }
+                      replaceCurrentSnapshot({
+                        replacedElement: { ...editingElement, isWriting: false },
+                      })
+                      return
+                    }
+                  }}
+                />
+                <div style={styledButtonWrapper}>
+                  <CmdButton cmdName="doneEditingText" onClick={handleClick} iconWidth={16} />
+                </div>
+              </div>
+            )
+          default:
+            return null
+        }
+      })()}
 
       {renderCanvas({
         onPointerMove: handlePointerMove,

@@ -408,13 +408,13 @@ export function App() {
           <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
           <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
         </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
           <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
         </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
           <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
         </span>
       </div>
@@ -473,6 +473,7 @@ export function App() {
                 replaceCurrentSnapshot={replaceCurrentSnapshot}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
+                zoomLevel={zoomLevel}
               />
             )
           case 'hand':

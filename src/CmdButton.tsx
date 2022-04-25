@@ -5,13 +5,24 @@ import zoomInSrc from './assets/zoom-in.svg'
 import resetPanZoomSrc from './assets/reset.svg'
 import clearCanvasSrc from './assets/delete.svg'
 import deleteElementSrc from './assets/x-circle.svg'
+import doneEditingTextSrc from './assets/plus.svg'
 
 export function CmdButton({
   cmdName,
   onClick,
+  iconWidth,
 }: {
-  cmdName: 'undo' | 'redo' | 'zoomOut' | 'zoomIn' | 'resetPanZoom' | 'clearCanvas' | 'deleteElement'
-  onClick: () => void
+  cmdName:
+    | 'undo'
+    | 'redo'
+    | 'zoomOut'
+    | 'zoomIn'
+    | 'resetPanZoom'
+    | 'clearCanvas'
+    | 'deleteElement'
+    | 'doneEditingText'
+  onClick: (e: React.MouseEvent) => void
+  iconWidth?: number
 }) {
   const srcMap: Record<typeof cmdName, string> = {
     undo: undoSrc,
@@ -21,11 +32,17 @@ export function CmdButton({
     resetPanZoom: resetPanZoomSrc,
     clearCanvas: clearCanvasSrc,
     deleteElement: deleteElementSrc,
+    doneEditingText: doneEditingTextSrc,
   }
 
   return (
     <button onClick={onClick}>
-      <img src={srcMap[cmdName]} alt={cmdName} width={20} style={{ verticalAlign: 'bottom' }} />
+      <img
+        src={srcMap[cmdName]}
+        alt={cmdName}
+        width={iconWidth ? iconWidth : 20}
+        style={{ verticalAlign: 'bottom' }}
+      />
     </button>
   )
 }
