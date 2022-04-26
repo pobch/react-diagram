@@ -1,10 +1,10 @@
-# Diagram Drawing App
+# Diagram Drawing App (not mobile friendly)
 
 A diagram drawing application demonstrating how we can utilize `React` and HTML `<canvas/>` to create an interactive drawing.
 
 ## Application URL
 
-https://react-diagram.netlify.app/
+https://react-diagram.netlify.app/ (should open in desktop)
 
 ## Features
 
@@ -23,6 +23,7 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [x] Pan feature
 - [x] Zoom feature
 - [x] CSS & Styling
+- [ ] Mobile & Resizing friendly
 - [ ] Rotate feature
 - [ ] Support uploading an image
 - [ ] Export canvas to png/jpeg
