@@ -7,8 +7,9 @@ import {
   TReplaceCurrentSnapshotParam,
   TSnapshot,
 } from './App'
+import { CONFIG } from './config'
 
-const generator = rough.generator()
+const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
 export function createRectangleElementWithoutId({
   x1,
@@ -64,7 +65,10 @@ export function CanvasForRect({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
-  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+  viewportCoordsToSceneCoords: (arg: {
+    viewportX: number
+    viewportY: number
+  }) => {
     sceneX: number
     sceneY: number
   }
