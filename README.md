@@ -6,9 +6,11 @@ A diagram drawing application demonstrating how we can utilize `React` and HTML 
 
 https://react-diagram.netlify.app/ (should open in desktop)
 
-## Features
+## Demo
 
 https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-8403-6d4d94d4011f.mp4
+
+## Feature Roadmap
 
 - [x] Line drawing tool
 - [x] Rectangle drawing tool
