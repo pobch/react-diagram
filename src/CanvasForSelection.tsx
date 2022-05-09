@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect, useReducer } from 'react'
 import * as React from 'react'
 import { createLinearElementWithoutId } from './CanvasForLinear'
 import { adjustRectangleCoordinates, createRectangleElementWithoutId } from './CanvasForRect'
@@ -363,11 +363,11 @@ type TUiState =
       state: 'none'
     }
   | {
-      state: 'initMove'
+      state: 'readyToMove'
       data: TMoveData
     }
   | {
-      state: 'initResize'
+      state: 'readyToResize'
       data: TResizeData
     }
   | {
@@ -384,6 +384,120 @@ type TUiState =
         elementId: number
       }
     }
+
+type TAction =
+  | { type: 'prepareMove'; data: TMoveData }
+  | { type: 'startMove'; data: TMoveData }
+  | { type: 'continueMove'; data: TMoveData }
+  | { type: 'stopMove'; data: { elementId: number } }
+  | { type: 'prepareResize'; data: TResizeData }
+  | { type: 'startResize'; data: TResizeData }
+  | { type: 'continueResize'; data: TResizeData }
+  | { type: 'stopResize'; data: { elementId: number } }
+  | { type: 'select'; data: { elementId: number } }
+  | { type: 'unselect' }
+  | { type: 'reset' }
+
+function reducer(prevState: TUiState, action: TAction): TUiState {
+  type TAllActionNames = TAction['type']
+  const validAction: {
+    [CurrentStateName in TUiState['state']]: { [ActionName in TAllActionNames]?: boolean }
+  } = {
+    none: {
+      prepareMove: true,
+    },
+    readyToMove: {
+      startMove: true,
+      select: true,
+      reset: true,
+    },
+    moving: {
+      continueMove: true,
+      stopMove: true,
+      reset: true,
+    },
+    readyToResize: {
+      startResize: true,
+      select: true,
+      reset: true,
+    },
+    resizing: {
+      continueResize: true,
+      stopResize: true,
+      reset: true,
+    },
+    idleSelecting: {
+      unselect: true,
+      prepareMove: true,
+      prepareResize: true,
+      reset: true,
+    },
+  }
+
+  const mapActionNameToNextStateName = {
+    prepareMove: 'readyToMove',
+    startMove: 'moving',
+    continueMove: 'moving',
+    stopMove: 'idleSelecting',
+    prepareResize: 'readyToResize',
+    startResize: 'resizing',
+    continueResize: 'resizing',
+    stopResize: 'idleSelecting',
+    select: 'idleSelecting',
+    unselect: 'none',
+    reset: 'none',
+  } as const
+
+  const isActionValid = validAction[prevState.state][action.type]
+  if (!isActionValid) {
+    throw new Error(
+      `Changing state from "${prevState.state}" by action "${action.type}" is not allowed.`
+    )
+  }
+  switch (action.type) {
+    case 'prepareMove': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'startMove':
+    case 'continueMove': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'stopMove': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'prepareResize': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'startResize':
+    case 'continueResize': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'stopResize': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'select': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'unselect': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName }
+    }
+    case 'reset': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName }
+    }
+    default: {
+      throw new Error('Unsupported action type inside the reducer')
+    }
+  }
+}
 
 /**
  * * -----------------------------------------
@@ -407,7 +521,10 @@ export function CanvasForSelection({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
-  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+  viewportCoordsToSceneCoords: (arg: {
+    viewportX: number
+    viewportY: number
+  }) => {
     sceneX: number
     sceneY: number
   }
@@ -416,14 +533,14 @@ export function CanvasForSelection({
     drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
   }) => void
 }) {
-  const [uiState, setUiState] = useState<TUiState>({ state: 'none' })
+  const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
 
   // useLayoutEffect() in the parent will be ignored in case of a selection tool.
   // ... Therefore, all canvas drawing logics need to be here instead.
   useLayoutEffect(() => {
     if (
-      uiState.state === 'initMove' ||
-      uiState.state === 'initResize' ||
+      uiState.state === 'readyToMove' ||
+      uiState.state === 'readyToResize' ||
       uiState.state === 'moving' ||
       uiState.state === 'resizing' ||
       uiState.state === 'idleSelecting'
@@ -545,26 +662,26 @@ export function CanvasForSelection({
   }, [uiState, drawScene, elementsSnapshot])
 
   // ?? Is there any better approach
-  // Reset actionState when it is holding an element's id that is not being drawn in the canvas.
+  // Reset uiState when it is holding an element's id that is not being drawn in the canvas.
   // Example case#1:
-  // 1. Click to select the latest created element (the element id is recorded in actionState)
+  // 1. Click to select the latest created element (the element id is recorded in uiState)
   // 2. Click undo until the selected element disappear (at this state, the snapshot revert
-  //    to the point that does not have this element at all, but actionState is still holding the element id)
+  //    to the point that does not have this element at all, but uiState is still holding the element id)
   // Case#2:
   // 1. Click to select any element
   // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
-  //    but actionState still holding its id)
+  //    but uiState still holding its id)
   useEffect(() => {
     if (
-      uiState.state === 'initMove' ||
-      uiState.state === 'initResize' ||
+      uiState.state === 'readyToMove' ||
+      uiState.state === 'readyToResize' ||
       uiState.state === 'moving' ||
       uiState.state === 'resizing' ||
       uiState.state === 'idleSelecting'
     ) {
       const selectedElementInSnapshot = elementsSnapshot[uiState.data.elementId]
       if (!selectedElementInSnapshot || selectedElementInSnapshot.type === 'removed') {
-        setUiState({ state: 'none' })
+        dispatch({ type: 'reset' })
       }
     }
   }, [uiState, elementsSnapshot])
@@ -585,8 +702,8 @@ export function CanvasForSelection({
       if (!selected) return
 
       // when current action is "none", we only allow to move an element
-      setUiState({
-        state: 'initMove',
+      dispatch({
+        type: 'prepareMove',
         data: createMoveData({
           targetElement: selected.firstFoundElement,
           pointerX: sceneX,
@@ -608,16 +725,14 @@ export function CanvasForSelection({
       })
       // a pointer is not click on any elements
       if (!selected) {
-        setUiState({
-          state: 'none',
-        })
+        dispatch({ type: 'unselect' })
         return
       }
       // a pointer clicked on a different element than the dashed element
       if (selected.firstFoundElement.id !== uiState.data.elementId) {
         // allow to move only
-        setUiState({
-          state: 'initMove',
+        dispatch({
+          type: 'prepareMove',
           data: createMoveData({
             targetElement: selected.firstFoundElement,
             pointerX: sceneX,
@@ -630,8 +745,8 @@ export function CanvasForSelection({
       // when the current action is "idleSelecting", we allow to either move or resize an element
       // ... so, we need to check which part of the element was clicked
       if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
-        setUiState({
-          state: 'initMove',
+        dispatch({
+          type: 'prepareMove',
           data: createMoveData({
             targetElement: selected.firstFoundElement,
             pointerX: sceneX,
@@ -646,8 +761,8 @@ export function CanvasForSelection({
         selected.pointerPosition === 'br' ||
         selected.pointerPosition === 'bl'
       ) {
-        setUiState({
-          state: 'initResize',
+        dispatch({
+          type: 'prepareResize',
           data: createResizeData({
             targetElement: selected.firstFoundElement,
             pointerPosition: selected.pointerPosition,
@@ -671,8 +786,8 @@ export function CanvasForSelection({
       viewportY: e.clientY,
     })
 
-    // TODO: separate between "none" and "idleSelecting" state
-    // cursor UI
+    // cursor UI for all uiState
+    // TODO: Add state guard and separate cursor between "none" and other state
     const hovered = getFirstElementAtPosition({
       elementsSnapshot: elementsSnapshot,
       xPosition: sceneX,
@@ -696,12 +811,9 @@ export function CanvasForSelection({
     }
 
     // should come from onPointerDown()
-    if (uiState.state === 'initMove') {
+    if (uiState.state === 'readyToMove') {
       commitNewSnapshot({ mode: 'clone' })
-      setUiState({
-        state: 'moving',
-        data: { ...uiState.data },
-      })
+      dispatch({ type: 'startMove', data: { ...uiState.data } })
       return
     }
     // should come from previous onPointerMove()
@@ -731,6 +843,7 @@ export function CanvasForSelection({
           y2: newY1 + distanceY,
         })
         replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+        dispatch({ type: 'continueMove', data: { ...uiState.data } })
         return
       } else if (uiState.data.elementType === 'rectangle' && movingElement.type === 'rectangle') {
         const newX1 = sceneX - uiState.data.pointerOffsetX1
@@ -745,6 +858,7 @@ export function CanvasForSelection({
           height: height,
         })
         replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+        dispatch({ type: 'continueMove', data: { ...uiState.data } })
         return
       } else if (uiState.data.elementType === 'pencil' && movingElement.type === 'pencil') {
         const newPoints = uiState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
@@ -757,6 +871,7 @@ export function CanvasForSelection({
           points: newPoints,
         }
         replaceCurrentSnapshot({ replacedElement: newElement })
+        dispatch({ type: 'continueMove', data: { ...uiState.data } })
         return
       } else if (uiState.data.elementType === 'text' && movingElement.type === 'text') {
         const newElementWithoutId = createTextElementWithoutId({
@@ -767,6 +882,7 @@ export function CanvasForSelection({
           y1: sceneY - uiState.data.pointerOffsetY1,
         })
         replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+        dispatch({ type: 'continueMove', data: { ...uiState.data } })
         return
       } else {
         throw new Error('Mismatch between moving element data and actual element in the snapshot')
@@ -774,12 +890,9 @@ export function CanvasForSelection({
     }
 
     // should come from onPointerDown()
-    if (uiState.state === 'initResize') {
+    if (uiState.state === 'readyToResize') {
       commitNewSnapshot({ mode: 'clone' })
-      setUiState({
-        state: 'resizing',
-        data: { ...uiState.data },
-      })
+      dispatch({ type: 'startResize', data: { ...uiState.data } })
       return
     }
     // should come from previous onPointerMove()
@@ -804,6 +917,7 @@ export function CanvasForSelection({
             y2: resizingElement.y2,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         } else if (uiState.data.pointerPosition === 'end') {
           const newElementWithoutId = createLinearElementWithoutId({
@@ -814,9 +928,13 @@ export function CanvasForSelection({
             y2: sceneY,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         }
-        return
+        // should not reach here
+        throw new Error(
+          'While resizing a line or arrow, the pointer position is not at either end of the line.'
+        )
       } else if (uiState.data.elementType === 'rectangle' && resizingElement.type === 'rectangle') {
         if (uiState.data.pointerPosition === 'tl') {
           const newElementWithoutId = createRectangleElementWithoutId({
@@ -826,6 +944,7 @@ export function CanvasForSelection({
             height: resizingElement.y2 - sceneY,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         } else if (uiState.data.pointerPosition === 'tr') {
           const newElementWithoutId = createRectangleElementWithoutId({
@@ -835,6 +954,7 @@ export function CanvasForSelection({
             height: resizingElement.y2 - sceneY,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         } else if (uiState.data.pointerPosition === 'br') {
           const newElementWithoutId = createRectangleElementWithoutId({
@@ -844,6 +964,7 @@ export function CanvasForSelection({
             height: sceneY - resizingElement.y1,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         } else if (uiState.data.pointerPosition === 'bl') {
           const newElementWithoutId = createRectangleElementWithoutId({
@@ -853,9 +974,11 @@ export function CanvasForSelection({
             height: sceneY - resizingElement.y1,
           })
           replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+          dispatch({ type: 'continueResize', data: { ...uiState.data } })
           return
         }
-        return
+        // should not reach here
+        throw new Error('While resizing a rectangle, the pointer position is not at any corner.')
       } else {
         throw new Error('Mismatch between resizing element data and actual element in the snapshot')
       }
@@ -864,10 +987,10 @@ export function CanvasForSelection({
 
   function handlePointerUp(e: React.PointerEvent) {
     // should come straight from onPointerDown() without triggering onPointerMove()
-    if (uiState.state === 'initMove' || uiState.state === 'initResize') {
+    if (uiState.state === 'readyToMove' || uiState.state === 'readyToResize') {
       // the element is not actually move or resize
       // don't do anything with history
-      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
+      dispatch({ type: 'select', data: { elementId: uiState.data.elementId } })
       return
     }
 
@@ -887,13 +1010,17 @@ export function CanvasForSelection({
         height: newY2 - newY1,
       })
       replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: selectedIndex } })
-      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
+      dispatch({ type: 'stopResize', data: { elementId: uiState.data.elementId } })
       return
     }
 
     // should come from onPointerMove()
-    if (uiState.state === 'moving' || uiState.state === 'resizing') {
-      setUiState({ state: 'idleSelecting', data: { elementId: uiState.data.elementId } })
+    if (uiState.state === 'resizing') {
+      dispatch({ type: 'stopResize', data: { elementId: uiState.data.elementId } })
+      return
+    }
+    if (uiState.state === 'moving') {
+      dispatch({ type: 'stopMove', data: { elementId: uiState.data.elementId } })
       return
     }
   }
@@ -901,6 +1028,7 @@ export function CanvasForSelection({
   function handleClickDeleteElement() {
     if (uiState.state === 'idleSelecting') {
       commitNewSnapshot({ mode: 'removeElement', elementId: uiState.data.elementId })
+      dispatch({ type: 'reset' })
       return
     }
   }
