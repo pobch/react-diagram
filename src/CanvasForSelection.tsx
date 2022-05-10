@@ -365,7 +365,7 @@ type TResizeData =
 //
 // - state: areaSelecting -> action: stopDrag -> state: multiSelected
 //                                            ↳  state: idleSelecting (aka: singleSelected)
-//                        ↳  action: continueDrag -> state: areaSelecting
+//                        ↳  action: continueDrag -> state: areaSelecting (stay at previous state)
 //   note: may split stopDrag action to 1. stopDragWithSingleElmSelected and 2. stopDragWithMultiElmSelected
 //
 // - state: multiSelected -> action: prepareMove -> state: ...
