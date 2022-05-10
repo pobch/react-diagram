@@ -358,6 +358,20 @@ type TResizeData =
       pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
     }
 
+// TODO: For multi-select, we need these state machine flows:
+// - state: none -------------------------------> action: dragSelect -> state: areaSelecting
+//   state: idleSelecting(aka: singleSelected) _⤴
+//   state: multiSelecting _____________________⤴
+//
+// - state: areaSelecting -> action: stopDrag -> state: multiSelected
+//                                            ↳  state: idleSelecting (aka: singleSelected)
+//                        ↳  action: continueDrag -> state: areaSelecting
+//   note: may split stopDrag action to 1. stopDragWithSingleElmSelected and 2. stopDragWithMultiElmSelected
+//
+// - state: multiSelected -> action: prepareMove -> state: ...
+//                        ↳  action: unselect/reset -> state: ...
+//   note1: no resize action allowed
+//   note2: TMoveData need to be refactored to be an array
 type TUiState =
   | {
       state: 'none'
