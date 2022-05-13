@@ -53,7 +53,10 @@ export type TCommitNewSnapshotParam =
   | { mode: 'removeElement'; elementId: number }
   | { mode: 'removeAllElement' }
   | { mode: 'modifyElement'; modifiedElement: TElementData }
-export type TReplaceCurrentSnapshotParam = { replacedElement: TElementData }
+export type TReplaceCurrentSnapshotParam = {
+  replacedElement?: TElementData
+  replacedMultiElements?: TElementData[]
+}
 
 function useHistory() {
   const [history, setHistory] = useState<TSnapshot[]>([[]])
@@ -102,13 +105,33 @@ function useHistory() {
     return
   }
 
-  function replaceCurrentSnapshot({ replacedElement: newElement }: TReplaceCurrentSnapshotParam) {
+  function replaceCurrentSnapshot({
+    replacedElement,
+    replacedMultiElements,
+  }: TReplaceCurrentSnapshotParam) {
     if (!currentSnapshot) {
       throw new Error('The whole current snapshot is not exist in this point of history!!')
     }
-    const newSnapshot = [...currentSnapshot]
-    newSnapshot[newElement.id] = { ...newElement }
-    setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
+    if (replacedElement && replacedMultiElements) {
+      throw new Error('This function cannot receive both arguments at the same time')
+    }
+    if (!replacedElement && !replacedMultiElements) {
+      throw new Error('This function requires at least 1 argument')
+    }
+    if (replacedElement) {
+      let newSnapshot = [...currentSnapshot]
+      newSnapshot[replacedElement.id] = { ...replacedElement }
+      setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
+      return
+    }
+    if (replacedMultiElements) {
+      let newSnapshot = [...currentSnapshot]
+      replacedMultiElements.forEach((replacedElement) => {
+        newSnapshot[replacedElement.id] = { ...replacedElement }
+      })
+      setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
+      return
+    }
   }
 
   function undo() {

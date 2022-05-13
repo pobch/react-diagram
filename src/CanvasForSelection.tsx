@@ -243,51 +243,53 @@ function getFirstElementAtPosition({
   return { pointerPosition, firstFoundElement }
 }
 
-function createMoveData({
-  targetElement,
+function createMoveDataArray({
+  targetElements,
   pointerX,
   pointerY,
 }: {
-  targetElement: TElementData
+  targetElements: TElementData[]
   pointerX: number
   pointerY: number
-}): TMoveData {
-  switch (targetElement.type) {
-    case 'line':
-    case 'arrow':
-      return {
-        elementType: targetElement.type,
-        elementId: targetElement.id,
-        pointerOffsetX1: pointerX - targetElement.x1,
-        pointerOffsetY1: pointerY - targetElement.y1,
-      }
-    case 'rectangle':
-      return {
-        elementType: 'rectangle',
-        elementId: targetElement.id,
-        pointerOffsetX1: pointerX - targetElement.x1,
-        pointerOffsetY1: pointerY - targetElement.y1,
-      }
-    case 'pencil':
-      return {
-        elementType: 'pencil',
-        elementId: targetElement.id,
-        pointerOffsetFromPoints: targetElement.points.map((point) => ({
-          offsetX: pointerX - point.x,
-          offsetY: pointerY - point.y,
-        })),
-      }
-    case 'text':
-      return {
-        elementType: 'text',
-        elementId: targetElement.id,
-        pointerOffsetX1: pointerX - (targetElement.lines[0]?.lineX1 ?? pointerX),
-        pointerOffsetY1: pointerY - (targetElement.lines[0]?.lineY1 ?? pointerY),
-        content: targetElement.lines.map(({ lineContent }) => lineContent).join('\n'),
-      }
-    default:
-      throw new Error('Unsupported moving element type')
-  }
+}): TMoveData[] {
+  return targetElements.map((targetElement) => {
+    switch (targetElement.type) {
+      case 'line':
+      case 'arrow':
+        return {
+          elementType: targetElement.type,
+          elementId: targetElement.id,
+          pointerOffsetX1: pointerX - targetElement.x1,
+          pointerOffsetY1: pointerY - targetElement.y1,
+        }
+      case 'rectangle':
+        return {
+          elementType: 'rectangle',
+          elementId: targetElement.id,
+          pointerOffsetX1: pointerX - targetElement.x1,
+          pointerOffsetY1: pointerY - targetElement.y1,
+        }
+      case 'pencil':
+        return {
+          elementType: 'pencil',
+          elementId: targetElement.id,
+          pointerOffsetFromPoints: targetElement.points.map((point) => ({
+            offsetX: pointerX - point.x,
+            offsetY: pointerY - point.y,
+          })),
+        }
+      case 'text':
+        return {
+          elementType: 'text',
+          elementId: targetElement.id,
+          pointerOffsetX1: pointerX - (targetElement.lines[0]?.lineX1 ?? pointerX),
+          pointerOffsetY1: pointerY - (targetElement.lines[0]?.lineY1 ?? pointerY),
+          content: targetElement.lines.map(({ lineContent }) => lineContent).join('\n'),
+        }
+      default:
+        throw new Error('Unsupported moving element type')
+    }
+  })
 }
 
 function createResizeData({
@@ -359,9 +361,9 @@ type TResizeData =
     }
 
 // TODO: For multi-select, we need these state machine flows:
-// - state: none -------------------------------> action: dragSelect -> state: areaSelecting
-//   state: idleSelecting(aka: singleSelected) _⤴
-//   state: multiSelecting _____________________⤴
+// - state: none                               -> action: dragSelect -> state: areaSelecting
+//   state: idleSelecting(aka: singleSelected)  ⤴
+//   state: multiSelecting                      ⤴
 //
 // - state: areaSelecting -> action: stopDrag -> state: multiSelected
 //                                            ↳  state: idleSelecting (aka: singleSelected)
@@ -372,13 +374,17 @@ type TResizeData =
 //                        ↳  action: unselect/reset -> state: ...
 //   note1: no resize action allowed
 //   note2: TMoveData need to be refactored to be an array
+//
+// - action: select needs to split to 1. selectSingleElm and 2. selectMultiElms
+//
+// - action: stopMove needs to split to 1. stopMoveSingleElm and 2. stopMoveMultiElms
 type TUiState =
   | {
       state: 'none'
     }
   | {
       state: 'readyToMove'
-      data: TMoveData
+      data: TMoveData[]
     }
   | {
       state: 'readyToResize'
@@ -386,7 +392,7 @@ type TUiState =
     }
   | {
       state: 'moving'
-      data: TMoveData
+      data: TMoveData[]
     }
   | {
       state: 'resizing'
@@ -400,9 +406,9 @@ type TUiState =
     }
 
 type TAction =
-  | { type: 'prepareMove'; data: TMoveData }
-  | { type: 'startMove'; data: TMoveData }
-  | { type: 'continueMove'; data: TMoveData }
+  | { type: 'prepareMove'; data: TMoveData[] }
+  | { type: 'startMove'; data: TMoveData[] }
+  | { type: 'continueMove'; data: TMoveData[] }
   | { type: 'stopMove'; data: { elementId: number } }
   | { type: 'prepareResize'; data: TResizeData }
   | { type: 'startResize'; data: TResizeData }
@@ -549,20 +555,46 @@ export function CanvasForSelection({
 }) {
   const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
 
+  // helper
+  function getElementsInSnapshot(
+    uiStateData: { elementId: number }[] | { elementId: number }
+  ): TElementData[] {
+    let elementsInSnapshot: TElementData[] = []
+    // some states probably have multiple elements selected
+    if (Array.isArray(uiStateData)) {
+      elementsInSnapshot = uiStateData
+        .map((data) => {
+          const elementInSnapshot = elementsSnapshot[data.elementId]
+          return elementInSnapshot
+        })
+        .filter((elementInSnapshot): elementInSnapshot is TElementData =>
+          Boolean(elementInSnapshot)
+        )
+    }
+    // some states always have a single element selected
+    else {
+      elementsInSnapshot = Array.of(
+        elementsSnapshot[uiStateData.elementId]
+      ).filter((elementInSnapshot): elementInSnapshot is TElementData => Boolean(elementInSnapshot))
+    }
+    return elementsInSnapshot
+  }
+
   // useLayoutEffect() in the parent will be ignored in case of a selection tool.
   // ... Therefore, all canvas drawing logics need to be here instead.
   useLayoutEffect(() => {
     if (
       uiState.state === 'readyToMove' ||
-      uiState.state === 'readyToResize' ||
       uiState.state === 'moving' ||
+      uiState.state === 'readyToResize' ||
       uiState.state === 'resizing' ||
       uiState.state === 'idleSelecting'
     ) {
-      const selectedElement = elementsSnapshot[uiState.data.elementId]
+      const selectedElementsInSnapshot = getElementsInSnapshot(uiState.data)
+
       // draw dashed selection around all selected elements as an extra
       drawScene({
-        elements: selectedElement ? Array.of(selectedElement) : [],
+        elements: selectedElementsInSnapshot,
         drawFn: (element, canvas) => {
           if (element.type === 'rectangle') {
             const roughCanvas = rough.canvas(canvas)
@@ -693,8 +725,22 @@ export function CanvasForSelection({
       uiState.state === 'resizing' ||
       uiState.state === 'idleSelecting'
     ) {
-      const selectedElementInSnapshot = elementsSnapshot[uiState.data.elementId]
-      if (!selectedElementInSnapshot || selectedElementInSnapshot.type === 'removed') {
+      const uiStateData = Array.isArray(uiState.data) ? uiState.data : Array.of(uiState.data)
+
+      let hasUnmatchElementInSnapshot = false
+      for (let data of uiStateData) {
+        const selectedElementInSnapshot = elementsSnapshot[data.elementId]
+        const hasElementInSnapshot =
+          selectedElementInSnapshot && selectedElementInSnapshot.type !== 'removed'
+        if (hasElementInSnapshot) {
+          continue
+        } else {
+          hasUnmatchElementInSnapshot = true
+          break
+        }
+      }
+
+      if (hasUnmatchElementInSnapshot) {
         dispatch({ type: 'reset' })
       }
     }
@@ -718,8 +764,8 @@ export function CanvasForSelection({
       // when current action is "none", we only allow to move an element
       dispatch({
         type: 'prepareMove',
-        data: createMoveData({
-          targetElement: selected.firstFoundElement,
+        data: createMoveDataArray({
+          targetElements: [selected.firstFoundElement],
           pointerX: sceneX,
           pointerY: sceneY,
         }),
@@ -747,8 +793,8 @@ export function CanvasForSelection({
         // allow to move only
         dispatch({
           type: 'prepareMove',
-          data: createMoveData({
-            targetElement: selected.firstFoundElement,
+          data: createMoveDataArray({
+            targetElements: [selected.firstFoundElement],
             pointerX: sceneX,
             pointerY: sceneY,
           }),
@@ -761,8 +807,8 @@ export function CanvasForSelection({
       if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
         dispatch({
           type: 'prepareMove',
-          data: createMoveData({
-            targetElement: selected.firstFoundElement,
+          data: createMoveDataArray({
+            targetElements: [selected.firstFoundElement],
             pointerX: sceneX,
             pointerY: sceneY,
           }),
@@ -827,80 +873,93 @@ export function CanvasForSelection({
     // should come from onPointerDown()
     if (uiState.state === 'readyToMove') {
       commitNewSnapshot({ mode: 'clone' })
-      dispatch({ type: 'startMove', data: { ...uiState.data } })
+      dispatch({ type: 'startMove', data: [...uiState.data] })
       return
     }
     // should come from previous onPointerMove()
     if (uiState.state === 'moving') {
-      // replace this specific element
-      const index = uiState.data.elementId
+      // store all moving elements, will be used to replace the current snapshot
+      let replacedMultiElements: TElementData[] = []
 
-      const movingElement = elementsSnapshot[uiState.data.elementId]
-      if (!movingElement) {
-        throw new Error('You are trying to move an non-exist element in the current snapshot!!')
-      }
+      // create new element for replacing, one-by-one
+      uiState.data.forEach((moveData) => {
+        const index = moveData.elementId
 
-      if (
-        (uiState.data.elementType === 'line' && movingElement.type === 'line') ||
-        (uiState.data.elementType === 'arrow' && movingElement.type === 'arrow')
-      ) {
-        const newX1 = sceneX - uiState.data.pointerOffsetX1
-        const newY1 = sceneY - uiState.data.pointerOffsetY1
-        // keep existing line width
-        const distanceX = movingElement.x2 - movingElement.x1
-        const distanceY = movingElement.y2 - movingElement.y1
-        const newElementWithoutId = createLinearElementWithoutId({
-          lineType: movingElement.type,
-          x1: newX1,
-          y1: newY1,
-          x2: newX1 + distanceX,
-          y2: newY1 + distanceY,
-        })
-        replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-        dispatch({ type: 'continueMove', data: { ...uiState.data } })
-        return
-      } else if (uiState.data.elementType === 'rectangle' && movingElement.type === 'rectangle') {
-        const newX1 = sceneX - uiState.data.pointerOffsetX1
-        const newY1 = sceneY - uiState.data.pointerOffsetY1
-        // keep existing width + height
-        const width = movingElement.x2 - movingElement.x1
-        const height = movingElement.y2 - movingElement.y1
-        const newElementWithoutId = createRectangleElementWithoutId({
-          x1: newX1,
-          y1: newY1,
-          width: width,
-          height: height,
-        })
-        replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-        dispatch({ type: 'continueMove', data: { ...uiState.data } })
-        return
-      } else if (uiState.data.elementType === 'pencil' && movingElement.type === 'pencil') {
-        const newPoints = uiState.data.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
-          x: sceneX - offsetX,
-          y: sceneY - offsetY,
-        }))
-        const newElement: TElementData = {
-          id: index,
-          type: 'pencil',
-          points: newPoints,
+        const movingElementInSnapshot = elementsSnapshot[moveData.elementId]
+        if (!movingElementInSnapshot) {
+          throw new Error('You are trying to move an non-exist element in the current snapshot!!')
         }
-        replaceCurrentSnapshot({ replacedElement: newElement })
-        dispatch({ type: 'continueMove', data: { ...uiState.data } })
-        return
-      } else if (uiState.data.elementType === 'text' && movingElement.type === 'text') {
-        const newElementWithoutId = createTextElementWithoutId({
-          canvasForMeasure: canvasForMeasureRef.current,
-          content: uiState.data.content,
-          isWriting: false,
-          x1: sceneX - uiState.data.pointerOffsetX1,
-          y1: sceneY - uiState.data.pointerOffsetY1,
-        })
-        replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-        dispatch({ type: 'continueMove', data: { ...uiState.data } })
-        return
-      } else {
-        throw new Error('Mismatch between moving element data and actual element in the snapshot')
-      }
+        if (
+          (moveData.elementType === 'line' && movingElementInSnapshot.type === 'line') ||
+          (moveData.elementType === 'arrow' && movingElementInSnapshot.type === 'arrow')
+        ) {
+          const newX1 = sceneX - moveData.pointerOffsetX1
+          const newY1 = sceneY - moveData.pointerOffsetY1
+          // keep existing line width
+          const distanceX = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
+          const distanceY = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
+          const newElementWithoutId = createLinearElementWithoutId({
+            lineType: movingElementInSnapshot.type,
+            x1: newX1,
+            y1: newY1,
+            x2: newX1 + distanceX,
+            y2: newY1 + distanceY,
+          })
+          replacedMultiElements.push({ ...newElementWithoutId, id: index })
+          // continue forEach loop
+          return
+        } else if (
+          moveData.elementType === 'rectangle' &&
+          movingElementInSnapshot.type === 'rectangle'
+        ) {
+          const newX1 = sceneX - moveData.pointerOffsetX1
+          const newY1 = sceneY - moveData.pointerOffsetY1
+          // keep existing width + height
+          const width = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
+          const height = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
+          const newElementWithoutId = createRectangleElementWithoutId({
+            x1: newX1,
+            y1: newY1,
+            width: width,
+            height: height,
+          })
+          replacedMultiElements.push({ ...newElementWithoutId, id: index })
+          // continue forEach loop
+          return
+        } else if (moveData.elementType === 'pencil' && movingElementInSnapshot.type === 'pencil') {
+          const newPoints = moveData.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
+            x: sceneX - offsetX,
+            y: sceneY - offsetY,
+          }))
+          const newElement: TElementData = {
+            id: index,
+            type: 'pencil',
+            points: newPoints,
+          }
+          replacedMultiElements.push(newElement)
+          // continue forEach loop
+          return
+        } else if (moveData.elementType === 'text' && movingElementInSnapshot.type === 'text') {
+          const newElementWithoutId = createTextElementWithoutId({
+            canvasForMeasure: canvasForMeasureRef.current,
+            content: moveData.content,
+            isWriting: false,
+            x1: sceneX - moveData.pointerOffsetX1,
+            y1: sceneY - moveData.pointerOffsetY1,
+          })
+          replacedMultiElements.push({ ...newElementWithoutId, id: index })
+          // continue forEach loop
+          return
+        } else {
+          throw new Error(
+            '1. Mismatch between moving element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for moving'
+          )
+        }
+      })
+
+      replaceCurrentSnapshot({ replacedMultiElements })
+      dispatch({ type: 'continueMove', data: [...uiState.data] })
+      return
     }
 
     // should come from onPointerDown()
@@ -994,17 +1053,28 @@ export function CanvasForSelection({
         // should not reach here
         throw new Error('While resizing a rectangle, the pointer position is not at any corner.')
       } else {
-        throw new Error('Mismatch between resizing element data and actual element in the snapshot')
+        throw new Error(
+          '1. Mismatch between resizing element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for resizing'
+        )
       }
     }
   }
 
   function handlePointerUp(e: React.PointerEvent) {
     // should come straight from onPointerDown() without triggering onPointerMove()
-    if (uiState.state === 'readyToMove' || uiState.state === 'readyToResize') {
-      // the element is not actually move or resize
+    if (uiState.state === 'readyToResize') {
+      // the element is not actually resize
       // don't do anything with history
       dispatch({ type: 'select', data: { elementId: uiState.data.elementId } })
+      return
+    }
+    if (uiState.state === 'readyToMove') {
+      if (uiState.data.length === 0) {
+        throw new Error('Cannot select any element because the elementId is missing')
+      }
+      // the element is not actually move
+      // don't do anything with history
+      dispatch({ type: 'select', data: { elementId: uiState.data[0]?.elementId ?? -1 } })
       return
     }
 
@@ -1034,7 +1104,10 @@ export function CanvasForSelection({
       return
     }
     if (uiState.state === 'moving') {
-      dispatch({ type: 'stopMove', data: { elementId: uiState.data.elementId } })
+      if (uiState.data.length === 0) {
+        throw new Error('Cannot finish moving an element because the elementId is missing')
+      }
+      dispatch({ type: 'stopMove', data: { elementId: uiState.data[0]?.elementId ?? -1 } })
       return
     }
   }
