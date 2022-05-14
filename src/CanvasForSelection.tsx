@@ -129,24 +129,17 @@ type TResizeData =
       pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
     }
 
-// TODO: For multi-select, we need these state machine flows:
-// - state: none                               -> action: dragSelect -> state: areaSelecting
-//   state: idleSelecting(aka: singleSelected)  ⤴
-//   state: multiSelecting                      ⤴
-//
-// - state: areaSelecting -> action: stopDrag -> state: multiSelected
-//                                            ↳  state: idleSelecting (aka: singleSelected)
-//                        ↳  action: continueDrag -> state: areaSelecting (stay at previous state)
-//   note: may split stopDrag action to 1. stopDragWithSingleElmSelected and 2. stopDragWithMultiElmSelected
-//
-// - state: multiSelected -> action: prepareMove -> state: ...
-//                        ↳  action: unselect/reset -> state: ...
-//   note1: no resize action allowed
-//   note2: TMoveData need to be refactored to be an array
-//
-// - action: select needs to split to 1. selectSingleElm and 2. selectMultiElms
-//
-// - action: stopMove needs to split to 1. stopMoveSingleElm and 2. stopMoveMultiElms
+type TAreaSelectData = {
+  selectedElementIds: number[]
+  rectangleSelector: {
+    type: 'rectangleSelector'
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  }
+}
+
 export type TUiState =
   | {
       state: 'none'
@@ -156,104 +149,134 @@ export type TUiState =
       data: TMoveData[]
     }
   | {
-      state: 'readyToResize'
-      data: TResizeData
-    }
-  | {
       state: 'moving'
       data: TMoveData[]
+    }
+  | {
+      state: 'readyToResize'
+      data: TResizeData
     }
   | {
       state: 'resizing'
       data: TResizeData
     }
   | {
-      state: 'idleSelecting'
+      state: 'areaSelecting'
+      data: TAreaSelectData
+    }
+  | {
+      state: 'singleElementSelected'
       data: {
         elementId: number
       }
     }
+  | {
+      state: 'multiElementSelected'
+      data: {
+        elementIds: number[]
+      }
+    }
 
 export type TAction =
+  | { type: 'dragSelect'; data: TAreaSelectData }
   | { type: 'prepareMove'; data: TMoveData[] }
   | { type: 'startMove'; data: TMoveData[] }
   | { type: 'continueMove'; data: TMoveData[] }
-  | { type: 'stopMove'; data: { elementId: number } }
   | { type: 'prepareResize'; data: TResizeData }
   | { type: 'startResize'; data: TResizeData }
   | { type: 'continueResize'; data: TResizeData }
-  | { type: 'stopResize'; data: { elementId: number } }
-  | { type: 'select'; data: { elementId: number } }
-  | { type: 'unselect' }
+  | { type: 'selectSingleElement'; data: { elementId: number } }
+  | { type: 'selectMultipleElements'; data: { elementIds: number[] } }
   | { type: 'reset' }
 
+type TAllActionNames = TAction['type']
+
+export const validAction = {
+  none: {
+    prepareMove: 'prepareMove',
+    dragSelect: 'dragSelect',
+  },
+  readyToMove: {
+    startMove: 'startMove',
+    selectSingleElement: 'selectSingleElement',
+    selectMultipleElements: 'selectMultipleElements',
+    reset: 'reset',
+  },
+  moving: {
+    continueMove: 'continueMove',
+    selectSingleElement: 'selectSingleElement',
+    selectMultipleElements: 'selectMultipleElements',
+    reset: 'reset',
+  },
+  readyToResize: {
+    startResize: 'startResize',
+    selectSingleElement: 'selectSingleElement',
+    reset: 'reset',
+  },
+  resizing: {
+    continueResize: 'continueResize',
+    selectSingleElement: 'selectSingleElement',
+    reset: 'reset',
+  },
+  areaSelecting: {
+    dragSelect: 'dragSelect',
+    selectSingleElement: 'selectSingleElement',
+    selectMultipleElements: 'selectMultipleElements',
+    reset: 'reset',
+  },
+  singleElementSelected: {
+    prepareMove: 'prepareMove',
+    prepareResize: 'prepareResize',
+    dragSelect: 'dragSelect',
+    reset: 'reset',
+  },
+  multiElementSelected: {
+    prepareMove: 'prepareMove',
+    dragSelect: 'dragSelect',
+    reset: 'reset',
+  },
+} as const
+
+const mapActionNameToNextStateName = {
+  dragSelect: 'areaSelecting',
+
+  prepareMove: 'readyToMove',
+  startMove: 'moving',
+  continueMove: 'moving',
+
+  prepareResize: 'readyToResize',
+  startResize: 'resizing',
+  continueResize: 'resizing',
+
+  selectSingleElement: 'singleElementSelected',
+  selectMultipleElements: 'multiElementSelected',
+
+  reset: 'none',
+} as const
+
 function reducer(prevState: TUiState, action: TAction): TUiState {
-  type TAllActionNames = TAction['type']
-  const validAction: {
-    [CurrentStateName in TUiState['state']]: { [ActionName in TAllActionNames]?: boolean }
-  } = {
-    none: {
-      prepareMove: true,
-    },
-    readyToMove: {
-      startMove: true,
-      select: true,
-      reset: true,
-    },
-    moving: {
-      continueMove: true,
-      stopMove: true,
-      reset: true,
-    },
-    readyToResize: {
-      startResize: true,
-      select: true,
-      reset: true,
-    },
-    resizing: {
-      continueResize: true,
-      stopResize: true,
-      reset: true,
-    },
-    idleSelecting: {
-      unselect: true,
-      prepareMove: true,
-      prepareResize: true,
-      reset: true,
-    },
-  }
+  const validActionWithLooserType: {
+    [CurrentStateName in TUiState['state']]: { [ActionName in TAllActionNames]?: ActionName }
+  } = validAction
 
-  const mapActionNameToNextStateName = {
-    prepareMove: 'readyToMove',
-    startMove: 'moving',
-    continueMove: 'moving',
-    stopMove: 'idleSelecting',
-    prepareResize: 'readyToResize',
-    startResize: 'resizing',
-    continueResize: 'resizing',
-    stopResize: 'idleSelecting',
-    select: 'idleSelecting',
-    unselect: 'none',
-    reset: 'none',
-  } as const
-
-  const isActionValid = validAction[prevState.state][action.type]
+  const isActionValid = validActionWithLooserType[prevState.state][action.type]
   if (!isActionValid) {
     throw new Error(
       `Changing state from "${prevState.state}" by action "${action.type}" is not allowed.`
     )
   }
+
   switch (action.type) {
+    case 'dragSelect': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
     case 'prepareMove': {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }
     }
     case 'startMove':
     case 'continueMove': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'stopMove': {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }
     }
@@ -266,17 +289,13 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }
     }
-    case 'stopResize': {
+    case 'selectSingleElement': {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }
     }
-    case 'select': {
+    case 'selectMultipleElements': {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }
-    }
-    case 'unselect': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName }
     }
     case 'reset': {
       const nextStateName = mapActionNameToNextStateName[action.type]
@@ -286,6 +305,28 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
       throw new Error('Unsupported action type inside the reducer')
     }
   }
+}
+
+function getSelectedElementIdsFromState(uiState: TUiState) {
+  let elementIds: number[] = []
+
+  if (uiState.state === 'readyToMove' || uiState.state === 'moving') {
+    elementIds = uiState.data.map((moveData) => moveData.elementId)
+  } else if (
+    uiState.state === 'readyToResize' ||
+    uiState.state === 'resizing' ||
+    uiState.state === 'singleElementSelected'
+  ) {
+    elementIds = [uiState.data.elementId]
+  } else if (uiState.state === 'areaSelecting') {
+    elementIds = uiState.data.selectedElementIds
+  } else if (uiState.state === 'multiElementSelected') {
+    elementIds = uiState.data.elementIds
+  } else {
+    throw new Error(`Cannot extract selected element ids from "${uiState.state}" state`)
+  }
+
+  return elementIds
 }
 
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
@@ -320,8 +361,11 @@ export function CanvasForSelection({
     sceneY: number
   }
   drawScene: (extra?: {
-    elements: TElementData[]
-    drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
+    elements: (TElementData | TAreaSelectData['rectangleSelector'])[]
+    drawFn: (
+      element: TElementData | TAreaSelectData['rectangleSelector'],
+      canvas: HTMLCanvasElement
+    ) => void
   }) => void
 }) {
   const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
@@ -330,45 +374,44 @@ export function CanvasForSelection({
   // ... Therefore, all canvas drawing logics need to be here instead.
   useLayoutEffect(() => {
     // -------- Helper ---------
-    function getElementsInSnapshot(
-      uiStateData: { elementId: number }[] | { elementId: number }
-    ): TElementData[] {
-      let elementsInSnapshot: TElementData[] = []
-      // some states probably have multiple elements selected
-      if (Array.isArray(uiStateData)) {
-        elementsInSnapshot = uiStateData
-          .map((data) => {
-            const elementInSnapshot = elementsSnapshot[data.elementId]
-            return elementInSnapshot
-          })
-          .filter((elementInSnapshot): elementInSnapshot is TElementData =>
-            Boolean(elementInSnapshot)
-          )
-      }
-      // some states always have a single element selected
-      else {
-        elementsInSnapshot = Array.of(
-          elementsSnapshot[uiStateData.elementId]
-        ).filter((elementInSnapshot): elementInSnapshot is TElementData =>
+    function getElementsInSnapshot(elementIds: number[]): TElementData[] {
+      const elementsInSnapshot = elementIds
+        .map((elementId) => {
+          const elementInSnapshot = elementsSnapshot[elementId]
+          return elementInSnapshot
+        })
+        .filter((elementInSnapshot): elementInSnapshot is TElementData =>
           Boolean(elementInSnapshot)
         )
-      }
+
       return elementsInSnapshot
     }
     // ------------------------------
 
+    // all state we want to draw dashed lines
     if (
       uiState.state === 'readyToMove' ||
       uiState.state === 'moving' ||
       uiState.state === 'readyToResize' ||
       uiState.state === 'resizing' ||
-      uiState.state === 'idleSelecting'
+      uiState.state === 'areaSelecting' ||
+      uiState.state === 'singleElementSelected' ||
+      uiState.state === 'multiElementSelected'
     ) {
-      const selectedElementsInSnapshot = getElementsInSnapshot(uiState.data)
+      const selectedElementIds = getSelectedElementIdsFromState(uiState)
+      let extraElements: (
+        | TElementData
+        | TAreaSelectData['rectangleSelector']
+      )[] = getElementsInSnapshot(selectedElementIds)
+
+      // also draw rectangle selector (if exist)
+      if (uiState.state === 'areaSelecting') {
+        extraElements.push(uiState.data.rectangleSelector)
+      }
 
       // draw dashed selection around all selected elements as an extra
       drawScene({
-        elements: selectedElementsInSnapshot,
+        elements: extraElements,
         drawFn: (element, canvas) => {
           if (element.type === 'rectangle') {
             const roughCanvas = rough.canvas(canvas)
@@ -391,25 +434,44 @@ export function CanvasForSelection({
                 strokeLineDash: [5, 5],
               }
             )
-            roughCanvas.rectangle(dashTopLeft.x, dashTopLeft.y, dashOffset * 2, dashOffset * 2)
-            roughCanvas.rectangle(
-              dashTopLeft.x,
-              dashBottomRight.y - dashOffset * 2,
-              dashOffset * 2,
-              dashOffset * 2
+
+            // corners
+            if (uiState.state !== 'multiElementSelected') {
+              roughCanvas.rectangle(dashTopLeft.x, dashTopLeft.y, dashOffset * 2, dashOffset * 2)
+              roughCanvas.rectangle(
+                dashTopLeft.x,
+                dashBottomRight.y - dashOffset * 2,
+                dashOffset * 2,
+                dashOffset * 2
+              )
+              roughCanvas.rectangle(
+                dashBottomRight.x - dashOffset * 2,
+                dashBottomRight.y - dashOffset * 2,
+                dashOffset * 2,
+                dashOffset * 2
+              )
+              roughCanvas.rectangle(
+                dashBottomRight.x - dashOffset * 2,
+                dashTopLeft.y,
+                dashOffset * 2,
+                dashOffset * 2
+              )
+            }
+
+            return
+          } else if (element.type === 'rectangleSelector') {
+            const context = canvas.getContext('2d')
+            if (!context) return
+
+            context.save()
+            context.fillStyle = 'rgba(192, 38, 211, 0.2)'
+            context.fillRect(
+              element.x1,
+              element.y1,
+              element.x2 - element.x1,
+              element.y2 - element.y1
             )
-            roughCanvas.rectangle(
-              dashBottomRight.x - dashOffset * 2,
-              dashBottomRight.y - dashOffset * 2,
-              dashOffset * 2,
-              dashOffset * 2
-            )
-            roughCanvas.rectangle(
-              dashBottomRight.x - dashOffset * 2,
-              dashTopLeft.y,
-              dashOffset * 2,
-              dashOffset * 2
-            )
+            context.restore()
             return
           } else if (element.type === 'line' || element.type === 'arrow') {
             const roughCanvas = rough.canvas(canvas)
@@ -430,18 +492,23 @@ export function CanvasForSelection({
               element.y2 + dashOffset,
               { strokeLineDash: [5, 5] }
             )
-            roughCanvas.rectangle(
-              element.x1,
-              element.y1 - dashOffset,
-              dashOffset * 2,
-              dashOffset * 2
-            )
-            roughCanvas.rectangle(
-              element.x2,
-              element.y2 - dashOffset,
-              dashOffset * 2,
-              dashOffset * 2
-            )
+
+            // start/end of the line
+            if (uiState.state !== 'multiElementSelected') {
+              roughCanvas.rectangle(
+                element.x1,
+                element.y1 - dashOffset,
+                dashOffset * 2,
+                dashOffset * 2
+              )
+              roughCanvas.rectangle(
+                element.x2,
+                element.y2 - dashOffset,
+                dashOffset * 2,
+                dashOffset * 2
+              )
+            }
+
             return
           } else if (element.type === 'pencil') {
             const context = canvas.getContext('2d')
@@ -476,7 +543,7 @@ export function CanvasForSelection({
       return
     }
 
-    // no extra dashed selection being drawn
+    // all other state have no extra dashed lines, just normally draw the snapshot
     drawScene()
     return
   }, [uiState, drawScene, elementsSnapshot])
@@ -497,13 +564,15 @@ export function CanvasForSelection({
       uiState.state === 'readyToResize' ||
       uiState.state === 'moving' ||
       uiState.state === 'resizing' ||
-      uiState.state === 'idleSelecting'
+      uiState.state === 'areaSelecting' ||
+      uiState.state === 'singleElementSelected' ||
+      uiState.state === 'multiElementSelected'
     ) {
-      const uiStateData = Array.isArray(uiState.data) ? uiState.data : Array.of(uiState.data)
+      const selectedElementIds = getSelectedElementIdsFromState(uiState)
 
       let hasUnmatchElementInSnapshot = false
-      for (let data of uiStateData) {
-        const selectedElementInSnapshot = elementsSnapshot[data.elementId]
+      for (let elementId of selectedElementIds) {
+        const selectedElementInSnapshot = elementsSnapshot[elementId]
         const hasElementInSnapshot =
           selectedElementInSnapshot && selectedElementInSnapshot.type !== 'removed'
         if (hasElementInSnapshot) {
@@ -515,7 +584,7 @@ export function CanvasForSelection({
       }
 
       if (hasUnmatchElementInSnapshot) {
-        dispatch({ type: 'reset' })
+        dispatch({ type: validAction[uiState.state].reset })
       }
     }
   }, [uiState, elementsSnapshot])
@@ -535,8 +604,13 @@ export function CanvasForSelection({
   })
 
   function handleClickDeleteElement() {
-    if (uiState.state === 'idleSelecting') {
-      commitNewSnapshot({ mode: 'removeElement', elementId: uiState.data.elementId })
+    if (uiState.state === 'singleElementSelected') {
+      commitNewSnapshot({ mode: 'removeElements', elementIds: [uiState.data.elementId] })
+      dispatch({ type: 'reset' })
+      return
+    }
+    if (uiState.state === 'multiElementSelected') {
+      commitNewSnapshot({ mode: 'removeElements', elementIds: uiState.data.elementIds })
       dispatch({ type: 'reset' })
       return
     }
@@ -544,7 +618,7 @@ export function CanvasForSelection({
 
   return (
     <>
-      {/* TODO: find better approach for measure text dimension */}
+      {/* // TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
         width={1}
@@ -555,7 +629,7 @@ export function CanvasForSelection({
       </canvas>
 
       {/* floating delete button at top-left of the screen */}
-      {uiState.state === 'idleSelecting' ? (
+      {uiState.state === 'singleElementSelected' || uiState.state === 'multiElementSelected' ? (
         <div style={{ position: 'fixed', top: '45vh', left: '0.5rem' }}>
           <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />
         </div>

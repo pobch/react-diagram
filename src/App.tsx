@@ -50,7 +50,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : n
 export type TCommitNewSnapshotParam =
   | { mode: 'clone' }
   | { mode: 'addElement'; newElementWithoutId: DistributiveOmit<TElementData, 'id'> }
-  | { mode: 'removeElement'; elementId: number }
+  | { mode: 'removeElements'; elementIds: number[] }
   | { mode: 'removeAllElement' }
   | { mode: 'modifyElement'; modifiedElement: TElementData }
 export type TReplaceCurrentSnapshotParam = {
@@ -79,13 +79,14 @@ function useHistory() {
         id: currentSnapshot.length,
       }
       newSnapshot = [...currentSnapshot, newElement]
-    } else if (options.mode === 'removeElement') {
-      const removedElement = {
-        id: options.elementId,
-        type: 'removed',
-      } as const
+    } else if (options.mode === 'removeElements') {
       newSnapshot = [...currentSnapshot]
-      newSnapshot[options.elementId] = removedElement
+      options.elementIds.forEach((elementId) => {
+        newSnapshot[elementId] = {
+          id: elementId,
+          type: 'removed',
+        }
+      })
     } else if (options.mode === 'removeAllElement') {
       newSnapshot = []
     } else if (options.mode === 'modifyElement') {
@@ -201,10 +202,7 @@ export function App() {
   // * ------------ Canvas Drawing ------------
 
   const drawScene = useCallback(
-    (extra?: {
-      elements: TElementData[]
-      drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
-    }) => {
+    <T,>(extra?: { elements: T[]; drawFn: (element: T, canvas: HTMLCanvasElement) => void }) => {
       if (!canvasRef.current) return
 
       const canvas = canvasRef.current

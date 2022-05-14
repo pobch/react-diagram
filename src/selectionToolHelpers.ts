@@ -13,6 +13,7 @@ import {
   TAction,
   TCursorType,
   TUiState,
+  validAction,
 } from './CanvasForSelection'
 import { createTextElementWithoutId, getTextElementAtPosition } from './CanvasForText'
 
@@ -245,6 +246,96 @@ function getFirstElementAtPosition({
   return { pointerPosition, firstFoundElement }
 }
 
+function getAllElementIdsInsideRectSelector({
+  elementsSnapshot,
+  rectSelectorX1,
+  rectSelectorX2,
+  rectSelectorY1,
+  rectSelectorY2,
+}: {
+  elementsSnapshot: TElementData[]
+  rectSelectorX1: number
+  rectSelectorY1: number
+  rectSelectorX2: number
+  rectSelectorY2: number
+}) {
+  const selectedElements = elementsSnapshot.filter((element) => {
+    const rectMinX = Math.min(rectSelectorX1, rectSelectorX2)
+    const rectMaxX = Math.max(rectSelectorX1, rectSelectorX2)
+    const rectMinY = Math.min(rectSelectorY1, rectSelectorY2)
+    const rectMaxY = Math.max(rectSelectorY1, rectSelectorY2)
+    if (element.type === 'arrow' || element.type === 'line') {
+      if (
+        rectMinX <= element.x1 &&
+        element.x1 <= rectMaxX &&
+        rectMinY <= element.y1 &&
+        element.y1 <= rectMaxY &&
+        rectMinX <= element.x2 &&
+        element.x2 <= rectMaxX &&
+        rectMinY <= element.y2 &&
+        element.y2 <= rectMaxY
+      ) {
+        return true
+      }
+    } else if (element.type === 'rectangle') {
+      const elmMinX = Math.min(element.x1, element.x2)
+      const elmMaxX = Math.max(element.x1, element.x2)
+      const elmMinY = Math.min(element.y1, element.y2)
+      const elmMaxY = Math.max(element.y1, element.y2)
+      if (
+        rectMinX <= elmMinX &&
+        elmMinX <= rectMaxX &&
+        rectMinX <= elmMaxX &&
+        elmMaxX <= rectMaxX &&
+        rectMinY <= elmMinY &&
+        elmMinY <= rectMaxY &&
+        rectMinY <= elmMaxY &&
+        elmMaxY <= rectMaxY
+      ) {
+        return true
+      }
+    } else if (element.type === 'text') {
+      const elmMinX = element.lines[0]?.lineX1 ?? -Infinity
+      const elmMinY = element.lines[0]?.lineY1 ?? -Infinity
+      const elmMaxY =
+        (element.lines.at(-1)?.lineY1 ?? Infinity) + (element.lines.at(-1)?.lineHeight ?? Infinity)
+      let elmMaxX = -Infinity
+      element.lines.forEach((line) => {
+        elmMaxX = Math.max(line.lineX1 + line.lineWidth, elmMaxX)
+      })
+      if (elmMaxX === -Infinity) elmMaxX = Infinity
+
+      if (
+        rectMinX <= elmMinX &&
+        elmMinX <= rectMaxX &&
+        rectMinX <= elmMaxX &&
+        elmMaxX <= rectMaxX &&
+        rectMinY <= elmMinY &&
+        elmMinY <= rectMaxY &&
+        rectMinY <= elmMaxY &&
+        elmMaxY <= rectMaxY
+      ) {
+        return true
+      }
+    } else if (element.type === 'pencil') {
+      const isInside = element.points.every((point) => {
+        if (
+          rectMinX <= point.x &&
+          point.x <= rectMaxX &&
+          rectMinY <= point.y &&
+          point.y <= rectMaxY
+        ) {
+          return true
+        }
+        return false
+      })
+      return isInside
+    }
+    return false
+  })
+  return selectedElements.map((element) => element.id)
+}
+
 export function createPointerHandlers({
   uiState,
   dispatch,
@@ -305,25 +396,40 @@ export function createPointerHandlers({
     case 'none': {
       return {
         handlePointerDown(e: React.PointerEvent) {
-          // should come from previous onPointerDown() or initial state when mount
-
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
           })
-          const selected = getFirstElementAtPosition({
+
+          const selectedData = getFirstElementAtPosition({
             elementsSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
-          // a pointer is not click on any elements
-          if (!selected) return
 
-          // when current action is "none", we only allow to move an element
+          // pointer down does not hit on any elements
+          if (!selectedData) {
+            dispatch({
+              type: validAction[uiState.state].dragSelect,
+              data: {
+                rectangleSelector: {
+                  type: 'rectangleSelector',
+                  x1: sceneX,
+                  y1: sceneY,
+                  x2: sceneX,
+                  y2: sceneY,
+                },
+                selectedElementIds: [],
+              },
+            })
+            return
+          }
+
+          // pointer down hits on an element
           dispatch({
-            type: 'prepareMove',
+            type: validAction[uiState.state].prepareMove,
             data: createMoveDataArray({
-              targetElements: [selected.firstFoundElement],
+              targetElements: [selectedData.firstFoundElement],
               pointerX: sceneX,
               pointerY: sceneY,
             }),
@@ -336,26 +442,108 @@ export function createPointerHandlers({
         handlePointerUp(e: React.PointerEvent) {},
       }
     }
+    case 'areaSelecting': {
+      return {
+        handlePointerDown(e: React.PointerEvent) {},
+        handlePointerMove(e: React.PointerEvent) {
+          handleCursorUI(e)
+
+          // can come from either
+          // - onPointerDown() of previous 'none' || 'singleElementSelected' || 'multiElementSelected' state
+          // - onPointerMove() of the previous same state: 'areaSelecting'
+
+          const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+            viewportX: e.clientX,
+            viewportY: e.clientY,
+          })
+
+          // continue dragging
+          dispatch({
+            type: validAction[uiState.state].dragSelect,
+            data: {
+              rectangleSelector: {
+                type: 'rectangleSelector',
+                x1: uiState.data.rectangleSelector.x1,
+                y1: uiState.data.rectangleSelector.y1,
+                x2: sceneX,
+                y2: sceneY,
+              },
+              selectedElementIds: getAllElementIdsInsideRectSelector({
+                elementsSnapshot,
+                rectSelectorX1: uiState.data.rectangleSelector.x1,
+                rectSelectorY1: uiState.data.rectangleSelector.y1,
+                rectSelectorX2: sceneX,
+                rectSelectorY2: sceneY,
+              }),
+            },
+          })
+          return
+        },
+        handlePointerUp(e: React.PointerEvent) {
+          // should come from onPointerMove() of the previous same state: 'areaSelecting'
+
+          if (uiState.data.selectedElementIds.length >= 2) {
+            dispatch({
+              type: validAction[uiState.state].selectMultipleElements,
+              data: {
+                elementIds: uiState.data.selectedElementIds,
+              },
+            })
+            return
+          }
+          if (uiState.data.selectedElementIds.length === 1) {
+            dispatch({
+              type: validAction[uiState.state].selectSingleElement,
+              data: {
+                elementId: uiState.data.selectedElementIds[0]!,
+              },
+            })
+            return
+          }
+          if (uiState.data.selectedElementIds.length === 0) {
+            // no element got selected
+            dispatch({
+              type: validAction[uiState.state].reset,
+            })
+            return
+          }
+        },
+      }
+    }
     case 'readyToMove': {
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
           handleCursorUI(e)
 
-          // should come from onPointerDown()
+          // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
           commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: 'startMove', data: [...uiState.data] })
+          dispatch({ type: validAction[uiState.state].startMove, data: [...uiState.data] })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
-          // should come straight from onPointerDown() without triggering onPointerMove()
+          // Should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
+          // ... in the case that onPointerMove() is not triggered at all.
+          // This means the selected element(s) is not actually move.
+          // Therefore, don't do anything with history.
+
           if (uiState.data.length === 0) {
-            throw new Error('Cannot select any element because the elementId is missing')
+            throw new Error('Cannot select any element because the moving element id is missing')
           }
-          // the element is not actually move
-          // don't do anything with history
-          dispatch({ type: 'select', data: { elementId: uiState.data[0]?.elementId ?? -1 } })
-          return
+          if (uiState.data.length === 1) {
+            dispatch({
+              type: validAction[uiState.state].selectSingleElement,
+              data: { elementId: uiState.data[0]!.elementId },
+            })
+            return
+          }
+          if (uiState.data.length >= 2) {
+            dispatch({
+              type: validAction[uiState.state].selectMultipleElements,
+              data: { elementIds: uiState.data.map((moveData) => moveData.elementId) },
+            })
+            return
+          }
         },
       }
     }
@@ -365,7 +553,9 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           handleCursorUI(e)
 
-          // should come from previous onPointerMove()
+          // can come from either
+          // - onPointerMove() of previous 'readyToMove' state (when we start to move)
+          // - onPointerMove() of the previous same state: 'moving' (when we continue to move)
 
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
@@ -457,16 +647,30 @@ export function createPointerHandlers({
           })
 
           replaceCurrentSnapshot({ replacedMultiElements })
-          dispatch({ type: 'continueMove', data: [...uiState.data] })
+          dispatch({ type: validAction[uiState.state].continueMove, data: [...uiState.data] })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
-          // should come from onPointerMove()
+          // should come from onPointerMove() of the same previous same state: 'moving'
           if (uiState.data.length === 0) {
-            throw new Error('Cannot finish moving an element because the elementId is missing')
+            throw new Error(
+              'Cannot finish moving an element because the moving element id is missing'
+            )
           }
-          dispatch({ type: 'stopMove', data: { elementId: uiState.data[0]?.elementId ?? -1 } })
-          return
+          if (uiState.data.length === 1) {
+            dispatch({
+              type: validAction[uiState.state].selectSingleElement,
+              data: { elementId: uiState.data[0]!.elementId },
+            })
+            return
+          }
+          if (uiState.data.length >= 2) {
+            dispatch({
+              type: validAction[uiState.state].selectMultipleElements,
+              data: { elementIds: uiState.data.map((moveData) => moveData.elementId) },
+            })
+            return
+          }
         },
       }
     }
@@ -476,17 +680,21 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           handleCursorUI(e)
 
-          // should come from onPointerDown()
+          // should come from onPointerDown() of 'singleElementSelected' state
           commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: 'startResize', data: { ...uiState.data } })
+          dispatch({ type: validAction[uiState.state].startResize, data: { ...uiState.data } })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
-          // should come straight from onPointerDown() without triggering onPointerMove()
+          // Should come from onPointerDown() of 'singleElementSelected' state
+          // ... in the case that onPointerMove() is not triggered at all.
+          // This means the selected element is not actually resize.
+          // Therefore, don't do anything with history.
 
-          // the element is not actually resize
-          // don't do anything with history
-          dispatch({ type: 'select', data: { elementId: uiState.data.elementId } })
+          dispatch({
+            type: validAction[uiState.state].selectSingleElement,
+            data: { elementId: uiState.data.elementId },
+          })
           return
         },
       }
@@ -497,7 +705,10 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           handleCursorUI(e)
 
-          // should come from previous onPointerMove()
+          // can come from either
+          // - onPointerMove() of previous 'readyToResize' state (when we start to resize)
+          // - onPointerMove() of the previous same state: 'resizing' (when we continue to resize)
+
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
@@ -525,7 +736,10 @@ export function createPointerHandlers({
                 y2: resizingElement.y2,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             } else if (uiState.data.pointerPosition === 'end') {
               const newElementWithoutId = createLinearElementWithoutId({
@@ -536,7 +750,10 @@ export function createPointerHandlers({
                 y2: sceneY,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             }
             // should not reach here
@@ -555,7 +772,10 @@ export function createPointerHandlers({
                 height: resizingElement.y2 - sceneY,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             } else if (uiState.data.pointerPosition === 'tr') {
               const newElementWithoutId = createRectangleElementWithoutId({
@@ -565,7 +785,10 @@ export function createPointerHandlers({
                 height: resizingElement.y2 - sceneY,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             } else if (uiState.data.pointerPosition === 'br') {
               const newElementWithoutId = createRectangleElementWithoutId({
@@ -575,7 +798,10 @@ export function createPointerHandlers({
                 height: sceneY - resizingElement.y1,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             } else if (uiState.data.pointerPosition === 'bl') {
               const newElementWithoutId = createRectangleElementWithoutId({
@@ -585,7 +811,10 @@ export function createPointerHandlers({
                 height: sceneY - resizingElement.y1,
               })
               replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({ type: 'continueResize', data: { ...uiState.data } })
+              dispatch({
+                type: validAction[uiState.state].continueResize,
+                data: { ...uiState.data },
+              })
               return
             }
             // should not reach here
@@ -599,7 +828,7 @@ export function createPointerHandlers({
           }
         },
         handlePointerUp(e: React.PointerEvent) {
-          // should come from onPointerMove()
+          // should come from onPointerMove() of the same previous same state: 'resizing'
 
           // adjust coordinates to handle the case when resizing flips the rectangle
           if (uiState.data.elementType === 'rectangle') {
@@ -618,20 +847,24 @@ export function createPointerHandlers({
             replaceCurrentSnapshot({
               replacedElement: { ...newElementWithoutId, id: selectedIndex },
             })
-            dispatch({ type: 'stopResize', data: { elementId: uiState.data.elementId } })
+            dispatch({
+              type: validAction[uiState.state].selectSingleElement,
+              data: { elementId: uiState.data.elementId },
+            })
             return
           }
 
-          dispatch({ type: 'stopResize', data: { elementId: uiState.data.elementId } })
+          dispatch({
+            type: validAction[uiState.state].selectSingleElement,
+            data: { elementId: uiState.data.elementId },
+          })
           return
         },
       }
     }
-    case 'idleSelecting': {
+    case 'singleElementSelected': {
       return {
         handlePointerDown(e: React.PointerEvent) {
-          // should come from onPointerUp()
-
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
@@ -641,16 +874,29 @@ export function createPointerHandlers({
             xPosition: sceneX,
             yPosition: sceneY,
           })
-          // a pointer is not click on any elements
+
+          // pointer down does not hit on any elements
           if (!selected) {
-            dispatch({ type: 'unselect' })
+            dispatch({
+              type: validAction[uiState.state].dragSelect,
+              data: {
+                rectangleSelector: {
+                  type: 'rectangleSelector',
+                  x1: sceneX,
+                  y1: sceneY,
+                  x2: sceneX,
+                  y2: sceneY,
+                },
+                selectedElementIds: [],
+              },
+            })
             return
           }
-          // a pointer clicked on a different element than the dashed element
+          // pointer down hits a different element than the current selected element
           if (selected.firstFoundElement.id !== uiState.data.elementId) {
             // allow to move only
             dispatch({
-              type: 'prepareMove',
+              type: validAction[uiState.state].prepareMove,
               data: createMoveDataArray({
                 targetElements: [selected.firstFoundElement],
                 pointerX: sceneX,
@@ -660,11 +906,12 @@ export function createPointerHandlers({
             return
           }
 
-          // when the current action is "idleSelecting", we allow to either move or resize an element
+          // pointer down hits on the current selected element
+          // we allow to either move or resize an element
           // ... so, we need to check which part of the element was clicked
           if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
             dispatch({
-              type: 'prepareMove',
+              type: validAction[uiState.state].prepareMove,
               data: createMoveDataArray({
                 targetElements: [selected.firstFoundElement],
                 pointerX: sceneX,
@@ -680,7 +927,7 @@ export function createPointerHandlers({
             selected.pointerPosition === 'bl'
           ) {
             dispatch({
-              type: 'prepareResize',
+              type: validAction[uiState.state].prepareResize,
               data: createResizeData({
                 targetElement: selected.firstFoundElement,
                 pointerPosition: selected.pointerPosition,
@@ -690,6 +937,76 @@ export function createPointerHandlers({
             throw new Error(`${selected.pointerPosition} pointer position is not supported`)
           }
           return
+        },
+        handlePointerMove(e: React.PointerEvent) {
+          handleCursorUI(e)
+        },
+        handlePointerUp(e: React.PointerEvent) {},
+      }
+    }
+    case 'multiElementSelected': {
+      return {
+        handlePointerDown(e: React.PointerEvent) {
+          const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+            viewportX: e.clientX,
+            viewportY: e.clientY,
+          })
+          const selected = getFirstElementAtPosition({
+            elementsSnapshot,
+            xPosition: sceneX,
+            yPosition: sceneY,
+          })
+
+          // pointer down does not hit on any elements
+          if (!selected) {
+            dispatch({
+              type: validAction[uiState.state].dragSelect,
+              data: {
+                rectangleSelector: {
+                  type: 'rectangleSelector',
+                  x1: sceneX,
+                  y1: sceneY,
+                  x2: sceneX,
+                  y2: sceneY,
+                },
+                selectedElementIds: [],
+              },
+            })
+            return
+          }
+
+          // find out if a pointer down hits on one of the current selected elements or not
+          const currentSelectedElements = uiState.data.elementIds
+            .map((selectedId) => elementsSnapshot[selectedId])
+            .filter((element): element is TElementData => Boolean(element))
+          const firstSelectedAtPointer = getFirstElementAtPosition({
+            elementsSnapshot: currentSelectedElements,
+            xPosition: sceneX,
+            yPosition: sceneY,
+          })
+          const isPointerHitOneOfSelectedElements = Boolean(firstSelectedAtPointer)
+
+          // pointer down hits on the current selected elements
+          // we allow to move only
+          if (isPointerHitOneOfSelectedElements) {
+            dispatch({
+              type: validAction[uiState.state].prepareMove,
+              data: createMoveDataArray({
+                targetElements: currentSelectedElements,
+                pointerX: sceneX,
+                pointerY: sceneY,
+              }),
+            })
+            return
+          }
+          // pointer down hits on a different element than the current selected elements
+          // we reset state
+          else {
+            dispatch({
+              type: validAction[uiState.state].reset,
+            })
+            return
+          }
         },
         handlePointerMove(e: React.PointerEvent) {
           handleCursorUI(e)

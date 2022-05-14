@@ -97,11 +97,17 @@ export function CanvasForText({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
-  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
+  viewportCoordsToSceneCoords: (arg: {
+    viewportX: number
+    viewportY: number
+  }) => {
     sceneX: number
     sceneY: number
   }
-  sceneCoordsToViewportCoords: (arg: { sceneX: number; sceneY: number }) => {
+  sceneCoordsToViewportCoords: (arg: {
+    sceneX: number
+    sceneY: number
+  }) => {
     viewportX: number
     viewportY: number
   }
@@ -272,7 +278,7 @@ export function CanvasForText({
 
   return (
     <>
-      {/* TODO: find better approach for measure text dimension */}
+      {/* // TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
         width={1}
