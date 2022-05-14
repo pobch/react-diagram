@@ -26,7 +26,7 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [x] Zoom feature
 - [x] CSS & Styling
 - [ ] Mobile & Resizing friendly
-- [ ] Multi-select elements
+- [x] Multi-select elements
 - [ ] Copy & Paste elements
 - [ ] Save the result to file / local storage
 - [ ] Rotate feature
