@@ -35,3 +35,18 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [ ] Setting stroke color
 - [ ] Setting stroke width
 - [ ] Filled rectangle feature
+
+## Developer Notes
+
+### Steps for running visual tests
+
+1. Run `yarn visual:test` to do regression test
+2. If there is any failed test, investigate it one-by-one. To override a specific screenshot, run the following command.
+   ```bash
+   # We want to override screenshots only for test-file.spec.js
+   yarn cypress run --env type=base --config screenshotsFolder=cypress/snapshots/base,trashAssetsBeforeRuns=false --spec "**/test-file.spec.js"
+   ```
+3. After fixing failed tests, run `yarn visual:test` again.
+4. **Only after all tests are passed**, remove all existing screenshots and re-create them from scratch by running `visual:dangerously-override-all-base`. Note that, **this command is dangerous since you will lose all existing screenshots.**
+
+More info: [cypress-visual-regression Doc](https://github.com/mjhea0/cypress-visual-regression)

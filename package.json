@@ -27,8 +27,8 @@
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "cypress:open": "cypress open",
-    "visual:update-base": "cypress run --env type=base --config screenshotsFolder=cypress/snapshots/base",
-    "visual:test": "cypress run --env type=actual"
+    "visual:test": "cypress run --env type=actual",
+    "visual:dangerously-override-all-base": "cypress run --env type=base --config screenshotsFolder=cypress/snapshots/base"
   },
   "eslintConfig": {
     "extends": [
