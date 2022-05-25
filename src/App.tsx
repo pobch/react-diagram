@@ -10,6 +10,7 @@ import { CanvasForText } from './CanvasForText'
 import { CanvasForHand } from './CanvasForHand'
 import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
+import { CONFIG } from './config'
 
 export type TElementData =
   | {
@@ -223,7 +224,7 @@ export function App() {
       // context.lineWidth = 5
       // context.strokeRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
 
-      const roughCanvas = rough.canvas(canvas)
+      const roughCanvas = rough.canvas(canvas, { options: { seed: CONFIG.SEED } })
       elementsSnapshot.forEach((element) => {
         if (element.type === 'line' || element.type === 'rectangle' || element.type === 'arrow') {
           element.roughElements.forEach((roughElement) => {

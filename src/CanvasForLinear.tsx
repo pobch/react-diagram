@@ -7,8 +7,9 @@ import {
   TReplaceCurrentSnapshotParam,
   TSnapshot,
 } from './App'
+import { CONFIG } from './config'
 
-const generator = rough.generator()
+const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
 function createLineElementWithoutId({
   x1,

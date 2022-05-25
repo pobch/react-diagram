@@ -1,7 +1,7 @@
 it('should be able to create a rectangle', () => {
   cy.visit('http://localhost:3000/')
 
-  cy.get('img[alt="rectangle"]').click()
+  cy.findByRole('img', { name: 'rectangle' }).click()
   cy.get('#root')
     .trigger('pointerdown', {
       clientX: 100,

@@ -11,6 +11,7 @@ import rough from 'roughjs/bundled/rough.esm'
 import getStroke from 'perfect-freehand'
 import { CmdButton } from './CmdButton'
 import { createPointerHandlers } from './selectionToolHelpers'
+import { CONFIG } from './config'
 
 export function createMoveDataArray({
   targetElements,
@@ -353,10 +354,7 @@ export function CanvasForSelection({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
-  viewportCoordsToSceneCoords: (arg: {
-    viewportX: number
-    viewportY: number
-  }) => {
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
@@ -399,10 +397,8 @@ export function CanvasForSelection({
       uiState.state === 'multiElementSelected'
     ) {
       const selectedElementIds = getSelectedElementIdsFromState(uiState)
-      let extraElements: (
-        | TElementData
-        | TAreaSelectData['rectangleSelector']
-      )[] = getElementsInSnapshot(selectedElementIds)
+      let extraElements: (TElementData | TAreaSelectData['rectangleSelector'])[] =
+        getElementsInSnapshot(selectedElementIds)
 
       // also draw rectangle selector (if exist)
       if (uiState.state === 'areaSelecting') {
@@ -414,7 +410,7 @@ export function CanvasForSelection({
         elements: extraElements,
         drawFn: (element, canvas) => {
           if (element.type === 'rectangle') {
-            const roughCanvas = rough.canvas(canvas)
+            const roughCanvas = rough.canvas(canvas, { options: { seed: CONFIG.SEED } })
             const dashOffset = 5
             const dashTopLeft = {
               x: element.x1 - dashOffset,
@@ -474,7 +470,7 @@ export function CanvasForSelection({
             context.restore()
             return
           } else if (element.type === 'line' || element.type === 'arrow') {
-            const roughCanvas = rough.canvas(canvas)
+            const roughCanvas = rough.canvas(canvas, { options: { seed: CONFIG.SEED } })
             const dashOffset = 5
 
             // TODO: find better math equation
