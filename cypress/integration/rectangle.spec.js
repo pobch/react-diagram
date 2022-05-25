@@ -20,9 +20,5 @@ it('should be able to create a rectangle', () => {
       clientY: 350,
     })
 
-  cy.get('#root').toMatchImageSnapshot({
-    imageConfig: {
-      threshold: 0,
-    },
-  })
+  cy.compareSnapshot('happy-path-rectangle')
 })
