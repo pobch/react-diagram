@@ -11,6 +11,7 @@ import { CanvasForHand } from './CanvasForHand'
 import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
+import { useHandleCanvasResize } from './useHandleCanvasResize'
 
 export type TElementData =
   | {
@@ -272,6 +273,15 @@ export function App() {
     // ! also add tool as dependencies even though it's not being used inside useLayoutEffect()
     tool,
   ])
+
+  // * ------------ Handle Viewport Resizing ------------
+
+  // ?? This approach is more likely a hack.
+  // The more straightforward way is to call `drawScene()` whenever the viewport is resized.
+  // However, `drawScene()` is currently called in multiple places with different args,
+  // ... e.g. in this component(without args) and in <CanvasForSelection/> (with args).
+  // That creates another complexity.
+  useHandleCanvasResize(canvasRef)
 
   // * --------------- Reusable renderProps ---------------
   function renderCanvas({
