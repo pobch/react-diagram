@@ -554,6 +554,12 @@ export function CanvasForSelection({
   // 1. Click to select any element
   // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
   //    but uiState still holding its id)
+  // TODO: A Better approach:
+  // 1. In the parent component, set `key` for this component to equal to the history index
+  // 2. When the history index changes, it will always re-mount this component
+  //    - The history index can be changed by undo, redo, add/remove/move/resize elements
+  // 3. Remove `reset` action as a valid action of some uiState (re-consider them one-by-one)
+  // 4. Remove the whole `useEffect` block below
   useEffect(() => {
     if (
       uiState.state === 'readyToMove' ||
