@@ -11,6 +11,7 @@ import { CanvasForHand } from './CanvasForHand'
 import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
+import { useHandleCanvasResize } from './useHandleCanvasResize'
 
 export type TElementData =
   | {
@@ -272,6 +273,9 @@ export function App() {
     // ! also add tool as dependencies even though it's not being used inside useLayoutEffect()
     tool,
   ])
+
+  // * ------------ Handle Viewport Resizing ------------
+  useHandleCanvasResize(canvasRef)
 
   // * --------------- Reusable renderProps ---------------
   function renderCanvas({
