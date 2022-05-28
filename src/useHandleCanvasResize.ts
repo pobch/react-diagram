@@ -27,7 +27,9 @@ export function useHandleCanvasResize(canvasRef: React.RefObject<HTMLCanvasEleme
       }
       img.addEventListener('load', onLoad)
 
-      // ?? no need to clean up & remove the event listener because `img = new Image()` is newly created every time
+      // ?? no need to clean up & remove the event listener
+      // ... because `const img = new Image()` is newly created every time
+      // ... useEffect() is called
     }
   }, [canvasRef, imgDataUrlBeforeResize])
 }
