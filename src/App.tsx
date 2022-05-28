@@ -275,6 +275,12 @@ export function App() {
   ])
 
   // * ------------ Handle Viewport Resizing ------------
+
+  // ?? This approach is more likely a hack.
+  // The more straightforward way is to call `drawScene()` whenever the viewport is resized.
+  // However, `drawScene()` is currently called in multiple places with different args,
+  // ... e.g. in this component(without args) and in <CanvasForSelection/> (with args).
+  // That creates another complexity.
   useHandleCanvasResize(canvasRef)
 
   // * --------------- Reusable renderProps ---------------
