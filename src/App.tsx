@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { Drawable } from 'roughjs/bin/core'
 import rough from 'roughjs/bundled/rough.esm'
 import { CanvasForSelection } from './CanvasForSelection'
@@ -61,6 +61,8 @@ export type TReplaceCurrentSnapshotParam = {
 }
 
 function useHistory() {
+  // TODO: Combine these states into a single object OR use useReducer(). This will
+  // ... also help to avoid calling setCurrentIndex inside setHistory updater function.
   const [history, setHistory] = useState<TSnapshot[]>([[]])
   const [currentIndex, setCurrentIndex] = useState(0)
   const currentSnapshot = history[currentIndex]
@@ -149,12 +151,22 @@ function useHistory() {
     })
   }
 
+  // for debugging purpose, can remove this anytime
+  function DEBUG_importSnapshot(newSnapshot: TSnapshot) {
+    setHistory((prevHistory) => {
+      const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
+      setCurrentIndex(newHistory.length - 1)
+      return newHistory
+    })
+  }
+
   return {
     elementsSnapshot: currentSnapshot,
     commitNewSnapshot,
     replaceCurrentSnapshot,
     undo,
     redo,
+    DEBUG_importSnapshot,
   }
 }
 
@@ -186,12 +198,31 @@ export type TTool = 'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'ha
 
 export function App() {
   const [tool, setTool] = useState<TTool>('selection')
-  const { elementsSnapshot, commitNewSnapshot, replaceCurrentSnapshot, undo, redo } = useHistory()
+  const {
+    elementsSnapshot,
+    commitNewSnapshot,
+    replaceCurrentSnapshot,
+    undo,
+    redo,
+    DEBUG_importSnapshot,
+  } = useHistory()
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
 
   const [zoomLevel, setZoomLevel] = useState(1)
   const [originOffset, setOriginOffset] = useState({ x: 0, y: 0 })
+
+  // * ----------- For Debugging -----------
+  // Can remove this anytime
+  useEffect(
+    function FOR_DEBUG() {
+      ;(window as any).exportSnapshot = () => {
+        return elementsSnapshot
+      }
+      ;(window as any).importSnapshot = DEBUG_importSnapshot
+    },
+    [DEBUG_importSnapshot, elementsSnapshot]
+  )
 
   // * ----------- Clear Canvas -------------
 
