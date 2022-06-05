@@ -18,3 +18,10 @@ body {
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+button {
+  /* appearance: none; */
+  border-radius: 0;
+  border: 2px solid skyblue;
+  background-color: thistle;
+}
