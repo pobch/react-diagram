@@ -1,4 +1,6 @@
-* {
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -17,4 +19,20 @@ body {
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+button {
+  padding: 0.125rem;
+  border-radius: 0;
+  border: 1px solid #0ea5e9; /* sky-500 */
+  background-color: #bae6fd; /* sky-200 */
+}
+
+button:active,
+button:hover {
+  background-color: #7dd3fc; /* sky-300 */
+}
+
+button:focus-visible {
+  outline: 1px solid #8b5cf6; /* violet-500 */
 }

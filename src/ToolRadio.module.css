@@ -2,6 +2,9 @@
 
 .radioInput {
   appearance: none;
+  /* remove remaining space in iOS */
+  width: 1px;
+  height: 1px;
 }
 
 .radioLabel {
@@ -16,10 +19,10 @@
 /* State styling */
 
 .radioInput:checked + .radioLabel {
-  background-color: #bae6fd;
+  background-color: #bae6fd; /* sky-200 */
   border: 1px dashed black;
 }
 
 .radioInput:focus-visible + .radioLabel {
-  outline: 1px solid blue;
+  outline: 1px solid #8b5cf6; /* violet-500 */
 }
