@@ -41,13 +41,14 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 ### Steps for running visual tests
 
 1. Run `yarn visual:test` to do regression test
-2. If there is any failed test, investigate it one-by-one. To override a specific screenshot, run the following command.
+2. If there is any failed test, investigate it one-by-one by going to `./cypress/snapshots/diff` directory.
+3. After a specific test file is fixed. To override all base screenshots of that file, run the following command.
    ```bash
-   # We want to override screenshots only for test-file.spec.js
+   # We want to override ALL screenshots for test-file.spec.js file
    yarn cypress run --env type=base --config screenshotsFolder=cypress/snapshots/base,trashAssetsBeforeRuns=false --spec "cypress/integration/test-file.spec.js"
    ```
-3. After fixing failed tests, run `yarn visual:test` again.
-4. **Only after all tests are passed**, remove all existing screenshots and re-create them from scratch by running `visual:dangerously-override-all-base`. Note that, **this command is dangerous since you will lose all existing screenshots.**
+4. Repeat step 2-3 until `yarn visual:test` results all passed.
+5. **Only after all tests are passed**, clean up all existing screenshots and re-create them from scratch by running `yarn visual:dangerously-override-all-base`. Note that, **this command is dangerous since you will lose all existing screenshots.**
 
 Note: Tests may fail due to OS difference. All base screenshots are created on Macbook Pro 13".
 
