@@ -481,6 +481,7 @@ export function App() {
             commitNewSnapshot={commitNewSnapshot}
             // TODO: Take viewport coords into account(to work well with zoom), instead of hardcode x1, y1 scene
             scenePositionToDrawImage={{ x1: originOffset.x + 100, y1: originOffset.y + 100 }}
+            onUploadSuccess={() => setTool('selection')}
           />
         </span>
       </fieldset>

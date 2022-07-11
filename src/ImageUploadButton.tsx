@@ -3,9 +3,11 @@ import { TCommitNewSnapshotParam, TElementData } from './App'
 export function ImageUploadButton({
   commitNewSnapshot,
   scenePositionToDrawImage,
+  onUploadSuccess,
 }: {
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
   scenePositionToDrawImage: { x1: number; y1: number }
+  onUploadSuccess: () => void
 }) {
   return (
     <>
@@ -29,8 +31,11 @@ export function ImageUploadButton({
                 data: imageBitmap,
               },
             })
+
             // make onChange being triggered again even though the user select the same image
             e.target.value = ''
+
+            onUploadSuccess()
           })
         }}
       />
