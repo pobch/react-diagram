@@ -4,9 +4,9 @@ import {
   TElementData,
   TReplaceCurrentSnapshotParam,
   TSnapshot,
-} from './App'
-import { createLinearElementWithoutId } from './CanvasForLinear'
-import { adjustRectangleCoordinates, createRectangleElementWithoutId } from './CanvasForRect'
+} from '../App'
+import { createLinearElementWithoutId } from '../CanvasForLinear'
+import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../CanvasForRect'
 import {
   createMoveDataArray,
   createResizeData,
@@ -14,8 +14,10 @@ import {
   TCursorType,
   TUiState,
   validAction,
-} from './CanvasForSelection'
-import { createTextElementWithoutId, getTextElementAtPosition } from './CanvasForText'
+} from '../CanvasForSelection'
+import { createTextElementWithoutId, getTextElementAtPosition } from '../CanvasForText'
+import { moveImageElement, moveRectangleElement } from './moveHelpers'
+import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
 
 function getFirstElementAtPosition({
   elementsSnapshot,
@@ -116,7 +118,7 @@ function getFirstElementAtPosition({
         break // 1st loop
       }
       continue // 1st loop
-    } else if (element.type === 'rectangle') {
+    } else if (element.type === 'rectangle' || element.type === 'image') {
       // check if a pointer is at top-left
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
         firstFoundElement = element
@@ -180,16 +182,19 @@ function getFirstElementAtPosition({
         pointerPosition = 'onLine'
         break // 1st loop
       }
-      // TODO: check if a pointer is inside the rectangle after we support filled rectangle
-      // else if (
-      //   element.x1 <= xPosition &&
-      //   xPosition <= element.x2 &&
-      //   element.y1 <= yPosition &&
-      //   yPosition <= element.y2
-      // ) {
-      //   ...
-      //   break // 1st loop
-      // }
+      // TODO: Also check if a pointer is inside the rectangle after we support filled rectangle
+      else if (
+        // only for image element
+        element.type === 'image' &&
+        element.x1 < xPosition &&
+        xPosition < element.x2 &&
+        element.y1 < yPosition &&
+        yPosition < element.y2
+      ) {
+        firstFoundElement = element
+        pointerPosition = 'inside'
+        break // 1st loop
+      }
 
       continue // 1st loop
     } else if (element.type === 'pencil') {
@@ -277,7 +282,7 @@ function getAllElementIdsInsideRectSelector({
       ) {
         return true
       }
-    } else if (element.type === 'rectangle') {
+    } else if (element.type === 'rectangle' || element.type === 'image') {
       const elmMinX = Math.min(element.x1, element.x2)
       const elmMaxX = Math.max(element.x1, element.x2)
       const elmMinY = Math.min(element.y1, element.y2)
@@ -351,10 +356,7 @@ export function createPointerHandlers({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
-  viewportCoordsToSceneCoords: (arg: {
-    viewportX: number
-    viewportY: number
-  }) => {
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
@@ -600,14 +602,24 @@ export function createPointerHandlers({
             ) {
               const newX1 = sceneX - moveData.pointerOffsetX1
               const newY1 = sceneY - moveData.pointerOffsetY1
-              // keep existing width + height
-              const width = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
-              const height = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
-              const newElementWithoutId = createRectangleElementWithoutId({
-                x1: newX1,
-                y1: newY1,
-                width: width,
-                height: height,
+              const newElementWithoutId = moveRectangleElement({
+                newX1: newX1,
+                newY1: newY1,
+                rectElementToMove: movingElementInSnapshot,
+              })
+              replacedMultiElements.push({ ...newElementWithoutId, id: index })
+              // continue forEach loop
+              return
+            } else if (
+              moveData.elementType === 'image' &&
+              movingElementInSnapshot.type === 'image'
+            ) {
+              const newX1 = sceneX - moveData.pointerOffsetX1
+              const newY1 = sceneY - moveData.pointerOffsetY1
+              const newElementWithoutId = moveImageElement({
+                newX1: newX1,
+                newY1: newY1,
+                imageElementToMove: movingElementInSnapshot,
               })
               replacedMultiElements.push({ ...newElementWithoutId, id: index })
               // continue forEach loop
@@ -764,63 +776,29 @@ export function createPointerHandlers({
             uiState.data.elementType === 'rectangle' &&
             resizingElement.type === 'rectangle'
           ) {
-            if (uiState.data.pointerPosition === 'tl') {
-              const newElementWithoutId = createRectangleElementWithoutId({
-                x1: sceneX,
-                y1: sceneY,
-                width: resizingElement.x2 - sceneX,
-                height: resizingElement.y2 - sceneY,
-              })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            } else if (uiState.data.pointerPosition === 'tr') {
-              const newElementWithoutId = createRectangleElementWithoutId({
-                x1: resizingElement.x1,
-                y1: sceneY,
-                width: sceneX - resizingElement.x1,
-                height: resizingElement.y2 - sceneY,
-              })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            } else if (uiState.data.pointerPosition === 'br') {
-              const newElementWithoutId = createRectangleElementWithoutId({
-                x1: resizingElement.x1,
-                y1: resizingElement.y1,
-                width: sceneX - resizingElement.x1,
-                height: sceneY - resizingElement.y1,
-              })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            } else if (uiState.data.pointerPosition === 'bl') {
-              const newElementWithoutId = createRectangleElementWithoutId({
-                x1: sceneX,
-                y1: resizingElement.y1,
-                width: resizingElement.x2 - sceneX,
-                height: sceneY - resizingElement.y1,
-              })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            }
-            // should not reach here
-            throw new Error(
-              'While resizing a rectangle, the pointer position is not at any corner.'
-            )
+            const newElementWithoutId = resizeRectangleElement({
+              newPointerPosition: { x: sceneX, y: sceneY },
+              pointerStartedAt: uiState.data.pointerPosition,
+              rectElementToResize: resizingElement,
+            })
+            replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+            dispatch({
+              type: validAction[uiState.state].continueResize,
+              data: { ...uiState.data },
+            })
+            return
+          } else if (uiState.data.elementType === 'image' && resizingElement.type === 'image') {
+            const newElementWithoutId = resizeImageElement({
+              newPointerPosition: { x: sceneX, y: sceneY },
+              pointerStartedAt: uiState.data.pointerPosition,
+              imageElementToResize: resizingElement,
+            })
+            replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+            dispatch({
+              type: validAction[uiState.state].continueResize,
+              data: { ...uiState.data },
+            })
+            return
           } else {
             throw new Error(
               '1. Mismatch between resizing element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for resizing'
