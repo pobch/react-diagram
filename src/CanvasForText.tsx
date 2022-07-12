@@ -97,17 +97,11 @@ export function CanvasForText({
   elementsSnapshot: TSnapshot
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
   replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
-  viewportCoordsToSceneCoords: (arg: {
-    viewportX: number
-    viewportY: number
-  }) => {
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
-  sceneCoordsToViewportCoords: (arg: {
-    sceneX: number
-    sceneY: number
-  }) => {
+  sceneCoordsToViewportCoords: (arg: { sceneX: number; sceneY: number }) => {
     viewportX: number
     viewportY: number
   }
@@ -118,8 +112,10 @@ export function CanvasForText({
     | {
         state: 'creating'
         data: {
+          // scene x, y
           textareaX1: number
           textareaY1: number
+          // viewport width/height
           textareaWidth: number
           textareaHeight: number
         }
@@ -128,8 +124,10 @@ export function CanvasForText({
         state: 'updating'
         data: {
           elementId: number
+          // scene x, y
           textareaX1: number
           textareaY1: number
+          // viewport width/height
           textareaWidth: number
           textareaHeight: number
           content: string
@@ -335,15 +333,25 @@ export function CanvasForText({
                   autoFocus
                   ref={textareaRef}
                   onChange={(e) => {
+                    // Shrink-then-expand the textarea to make it fits the content
+                    // ... no matter the user is deleting or adding text.
+                    e.target.style.width = '0'
+                    e.target.style.height = '0'
+                    const textareaWidth = e.target.scrollWidth
+                    const textareaHeight = e.target.scrollHeight
+                    e.target.style.width = `${textareaWidth}px`
+                    e.target.style.height = `${textareaHeight}px`
                     setUiState((prev) => {
                       if (prev.state === 'creating') {
                         return {
                           ...prev,
                           data: {
                             ...prev.data,
-                            // already taking zoomLevel into account
-                            textareaWidth: e.target.scrollWidth,
-                            textareaHeight: e.target.scrollHeight,
+                            // This is viewport(not scene) width/height. It's already taking zoomLevel into account
+                            // ... because width/height is calculated from a scaled font size(which is scaled by zoomLevel) in the content.
+                            // Also, read the values from closure, not from e.target, to match what we imperatively manipulate the DOM.
+                            textareaWidth: textareaWidth,
+                            textareaHeight: textareaHeight,
                           },
                         }
                       }
@@ -364,15 +372,21 @@ export function CanvasForText({
                   autoFocus
                   ref={textareaRef}
                   onChange={(e) => {
+                    // see comment in onChange of "creating" state above, for why we need to do this
+                    e.target.style.width = '0'
+                    e.target.style.height = '0'
+                    const textareaWidth = e.target.scrollWidth
+                    const textareaHeight = e.target.scrollHeight
+                    e.target.style.width = `${textareaWidth}px`
+                    e.target.style.height = `${textareaHeight}px`
                     setUiState((prev) => {
                       if (prev.state === 'updating') {
                         return {
                           ...prev,
                           data: {
                             ...prev.data,
-                            // already taking zoomLevel into account
-                            textareaWidth: e.target.scrollWidth,
-                            textareaHeight: e.target.scrollHeight,
+                            textareaWidth: textareaWidth,
+                            textareaHeight: textareaHeight,
                           },
                         }
                       }
