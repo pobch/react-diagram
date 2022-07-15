@@ -10,7 +10,7 @@ import {
 import rough from 'roughjs/bundled/rough.esm'
 import getStroke from 'perfect-freehand'
 import { CmdButton } from './CmdButton'
-import { createPointerHandlers } from './selectionToolHelpers'
+import { createPointerHandlers } from './selectionToolHelpers/eventHandlers'
 import { CONFIG } from './config'
 
 export function createMoveDataArray({
@@ -33,8 +33,9 @@ export function createMoveDataArray({
           pointerOffsetY1: pointerY - targetElement.y1,
         }
       case 'rectangle':
+      case 'image':
         return {
-          elementType: 'rectangle',
+          elementType: targetElement.type,
           elementId: targetElement.id,
           pointerOffsetX1: pointerX - targetElement.x1,
           pointerOffsetY1: pointerY - targetElement.y1,
@@ -73,7 +74,7 @@ export function createResizeData({
     case 'line':
     case 'arrow':
       if (pointerPosition !== 'start' && pointerPosition !== 'end') {
-        throw new Error('Impossible pointer position for resizing line element')
+        throw new Error('Impossible pointer position for resizing a linear element')
       }
       return {
         elementType: targetElement.type,
@@ -81,16 +82,17 @@ export function createResizeData({
         pointerPosition: pointerPosition,
       }
     case 'rectangle':
+    case 'image':
       if (
         pointerPosition !== 'tl' &&
         pointerPosition !== 'tr' &&
         pointerPosition !== 'bl' &&
         pointerPosition !== 'br'
       ) {
-        throw new Error('Impossible pointer position for resizing rectangle element')
+        throw new Error('Impossible pointer position for resizing a rectangle or image element')
       }
       return {
-        elementType: 'rectangle',
+        elementType: targetElement.type,
         elementId: targetElement.id,
         pointerPosition: pointerPosition,
       }
@@ -101,7 +103,7 @@ export function createResizeData({
 
 type TMoveData =
   | {
-      elementType: 'line' | 'rectangle' | 'arrow'
+      elementType: 'line' | 'rectangle' | 'arrow' | 'image'
       elementId: number
       pointerOffsetX1: number
       pointerOffsetY1: number
@@ -125,7 +127,7 @@ type TResizeData =
       pointerPosition: 'start' | 'end'
     }
   | {
-      elementType: 'rectangle'
+      elementType: 'rectangle' | 'image'
       elementId: number
       pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
     }
@@ -409,7 +411,7 @@ export function CanvasForSelection({
       drawScene({
         elements: extraElements,
         drawFn: (element, canvas) => {
-          if (element.type === 'rectangle') {
+          if (element.type === 'rectangle' || element.type === 'image') {
             const roughCanvas = rough.canvas(canvas, { options: { seed: CONFIG.SEED } })
             const dashOffset = 5
             const dashTopLeft = {

@@ -12,6 +12,7 @@ import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
 import { useHandleCanvasResize } from './useHandleCanvasResize'
+import { ImageUploadButton } from './ImageUploadButton'
 
 export type TElementData =
   | {
@@ -43,6 +44,15 @@ export type TElementData =
   | {
       type: 'removed'
       id: number
+    }
+  | {
+      type: 'image'
+      id: number
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+      data: ImageBitmap
     }
 
 export type TSnapshot = TElementData[]
@@ -152,6 +162,7 @@ function useHistory() {
   }
 
   // for debugging purpose, can remove this anytime
+  // not support image element
   function DEBUG_importSnapshot(newSnapshot: TSnapshot) {
     setHistory((prevHistory) => {
       const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
@@ -216,6 +227,7 @@ export function App() {
   // Can remove this anytime
   useEffect(
     function FOR_DEBUG() {
+      // not support image element
       ;(window as any).exportSnapshot = () => {
         return elementsSnapshot
       }
@@ -276,6 +288,14 @@ export function App() {
           }
         } else if (element.type === 'removed') {
           // don't draw
+        } else if (element.type === 'image') {
+          context.drawImage(
+            element.data,
+            element.x1,
+            element.y1,
+            element.x2 - element.x1,
+            element.y2 - element.y1
+          )
         }
       })
 
@@ -455,6 +475,14 @@ export function App() {
         </span>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <ToolRadio toolName="arrow" currentTool={tool} setCurrentTool={setTool} />
+        </span>
+        <span style={{ paddingInlineEnd: '0.5rem' }}>
+          <ImageUploadButton
+            commitNewSnapshot={commitNewSnapshot}
+            // TODO: Take viewport coords into account(to work well with zoom), instead of hardcode x1, y1 scene
+            scenePositionToDrawImage={{ x1: originOffset.x + 100, y1: originOffset.y + 100 }}
+            onUploadSuccess={() => setTool('selection')}
+          />
         </span>
       </fieldset>
 
