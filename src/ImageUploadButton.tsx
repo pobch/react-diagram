@@ -1,4 +1,5 @@
 import { TCommitNewSnapshotParam, TElementData } from './App'
+import iconSrc from './assets/image.svg'
 
 export function ImageUploadButton({
   commitNewSnapshot,
@@ -11,7 +12,9 @@ export function ImageUploadButton({
 }) {
   return (
     <>
-      <label htmlFor="image-upload">Img</label>
+      <label htmlFor="image-upload">
+        <img src={iconSrc} alt="upload" width={24} style={{ verticalAlign: 'bottom' }} />
+      </label>
       <input
         id="image-upload"
         type="file"
