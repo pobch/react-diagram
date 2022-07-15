@@ -22,19 +22,20 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [x] Arrow drawing tool
   - https://stackoverflow.com/a/26806316
   - https://codesandbox.io/s/magical-feynman-mtuziv?file=/src/index.js
-- [x] Pan feature
-- [x] Zoom feature
+- [x] Pan
+- [x] Zoom
 - [x] CSS & Styling
 - [ ] Mobile & Resizing friendly
 - [x] Multi-select elements
 - [ ] Copy & Paste elements
 - [ ] Save the result to file / local storage
-- [ ] Rotate feature
-- [ ] Support uploading an image
+- [ ] Rotate
+- [x] Support uploading an image
+- [ ] Send to back/front
 - [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
 - [ ] Setting stroke width
-- [ ] Filled rectangle feature
+- [ ] Filled rectangle
 
 ## Developer Notes
 
@@ -53,3 +54,10 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 Note: Tests may fail due to OS difference. All base screenshots are created on Macbook Pro 13".
 
 More info: [cypress-visual-regression Doc](https://github.com/mjhea0/cypress-visual-regression)
+
+### Temporary functions for export/import diagram
+
+The following functions are temporary. Mostly use for debugging. In the future, we will implement a proper export/import feature.
+
+- `exportSnapshot()` to export the diagram (must not have any image element)
+- `importSnapshot(value)` to import, `value` is the result of calling `exportSnapshot()` (must not have any image element)
