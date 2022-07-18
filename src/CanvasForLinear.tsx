@@ -1,12 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from './App'
+import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
@@ -101,9 +96,9 @@ export function createLinearElementWithoutId({
  */
 export function CanvasForLinear({
   renderCanvas,
-  elementsSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
   lineType,
 }: {
@@ -112,9 +107,9 @@ export function CanvasForLinear({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  elementsSnapshot: TSnapshot
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -171,7 +166,7 @@ export function CanvasForLinear({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
       if (!drawingElement || drawingElement.type !== lineType) {
         throw new Error(
           `The drawing element in the current snapshot is missing or not a "${lineType}" element`
@@ -186,7 +181,7 @@ export function CanvasForLinear({
         y2: sceneY,
       })
 
-      replaceCurrentSnapshot({
+      replaceCurrentSnapshotByReplacingElements({
         replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
       })
       return

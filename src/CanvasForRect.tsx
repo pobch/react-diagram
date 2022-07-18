@@ -1,12 +1,7 @@
 import * as React from 'react'
 import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from './App'
+import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
@@ -52,9 +47,9 @@ export function adjustRectangleCoordinates(
  */
 export function CanvasForRect({
   renderCanvas,
-  elementsSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
@@ -62,13 +57,10 @@ export function CanvasForRect({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  elementsSnapshot: TSnapshot
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
-  viewportCoordsToSceneCoords: (arg: {
-    viewportX: number
-    viewportY: number
-  }) => {
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
+  viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
@@ -119,7 +111,7 @@ export function CanvasForRect({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
       if (!drawingElement || drawingElement.type !== 'rectangle') {
         throw new Error(
           'The drawing element in the current snapshot is missing or not a "rectangle" element'
@@ -133,7 +125,7 @@ export function CanvasForRect({
         height: sceneY - y1,
       })
 
-      replaceCurrentSnapshot({
+      replaceCurrentSnapshotByReplacingElements({
         replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
       })
       return
@@ -150,7 +142,7 @@ export function CanvasForRect({
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
       // adjust coord when finish drawing
-      const drawnElement = elementsSnapshot[uiState.data.elementId]
+      const drawnElement = getElementInCurrentSnapshot(uiState.data.elementId)
       if (!drawnElement || drawnElement.type !== 'rectangle') {
         throw new Error(
           'The finishing drawing element in the current snapshot is missing or not a "rectangle" element'
@@ -163,7 +155,7 @@ export function CanvasForRect({
         width: newX2 - newX1,
         height: newY2 - newY1,
       })
-      replaceCurrentSnapshot({
+      replaceCurrentSnapshotByReplacingElements({
         replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
       })
       setUiState({ state: 'none' })

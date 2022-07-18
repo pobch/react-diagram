@@ -10,6 +10,7 @@ import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../
 import {
   createMoveDataArray,
   createResizeData,
+  getElementsInSnapshot,
   TAction,
   TCursorType,
   TUiState,
@@ -344,18 +345,20 @@ function getAllElementIdsInsideRectSelector({
 export function createPointerHandlers({
   uiState,
   dispatch,
-  elementsSnapshot,
+  currentSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
   setCursorType,
   canvasForMeasureRef,
 }: {
   uiState: TUiState
   dispatch: React.Dispatch<TAction>
-  elementsSnapshot: TSnapshot
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
+  currentSnapshot: TSnapshot
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -372,7 +375,7 @@ export function createPointerHandlers({
     // cursor UI for all uiState
     // TODO: Add state guard and separate cursor between "none" and other state
     const hovered = getFirstElementAtPosition({
-      elementsSnapshot: elementsSnapshot,
+      elementsSnapshot: currentSnapshot,
       xPosition: sceneX,
       yPosition: sceneY,
     })
@@ -404,7 +407,7 @@ export function createPointerHandlers({
           })
 
           const selectedData = getFirstElementAtPosition({
-            elementsSnapshot,
+            elementsSnapshot: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
@@ -471,7 +474,7 @@ export function createPointerHandlers({
                 y2: sceneY,
               },
               selectedElementIds: getAllElementIdsInsideRectSelector({
-                elementsSnapshot,
+                elementsSnapshot: currentSnapshot,
                 rectSelectorX1: uiState.data.rectangleSelector.x1,
                 rectSelectorY1: uiState.data.rectangleSelector.y1,
                 rectSelectorX2: sceneX,
@@ -569,9 +572,9 @@ export function createPointerHandlers({
 
           // create new element for replacing, one-by-one
           uiState.data.forEach((moveData) => {
-            const index = moveData.elementId
+            const movingElementId = moveData.elementId
 
-            const movingElementInSnapshot = elementsSnapshot[moveData.elementId]
+            const movingElementInSnapshot = getElementInCurrentSnapshot(movingElementId)
             if (!movingElementInSnapshot) {
               throw new Error(
                 'You are trying to move an non-exist element in the current snapshot!!'
@@ -593,7 +596,7 @@ export function createPointerHandlers({
                 x2: newX1 + distanceX,
                 y2: newY1 + distanceY,
               })
-              replacedMultiElements.push({ ...newElementWithoutId, id: index })
+              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
               // continue forEach loop
               return
             } else if (
@@ -607,7 +610,7 @@ export function createPointerHandlers({
                 newY1: newY1,
                 rectElementToMove: movingElementInSnapshot,
               })
-              replacedMultiElements.push({ ...newElementWithoutId, id: index })
+              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
               // continue forEach loop
               return
             } else if (
@@ -621,7 +624,7 @@ export function createPointerHandlers({
                 newY1: newY1,
                 imageElementToMove: movingElementInSnapshot,
               })
-              replacedMultiElements.push({ ...newElementWithoutId, id: index })
+              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
               // continue forEach loop
               return
             } else if (
@@ -633,7 +636,7 @@ export function createPointerHandlers({
                 y: sceneY - offsetY,
               }))
               const newElement: TElementData = {
-                id: index,
+                id: movingElementId,
                 type: 'pencil',
                 points: newPoints,
               }
@@ -648,7 +651,7 @@ export function createPointerHandlers({
                 x1: sceneX - moveData.pointerOffsetX1,
                 y1: sceneY - moveData.pointerOffsetY1,
               })
-              replacedMultiElements.push({ ...newElementWithoutId, id: index })
+              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
               // continue forEach loop
               return
             } else {
@@ -658,7 +661,7 @@ export function createPointerHandlers({
             }
           })
 
-          replaceCurrentSnapshot({ replacedMultiElements })
+          replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
           dispatch({ type: validAction[uiState.state].continueMove, data: [...uiState.data] })
           return
         },
@@ -727,9 +730,9 @@ export function createPointerHandlers({
           })
 
           // replace this specific element
-          const index = uiState.data.elementId
+          const resizingElementId = uiState.data.elementId
 
-          const resizingElement = elementsSnapshot[uiState.data.elementId]
+          const resizingElement = getElementInCurrentSnapshot(resizingElementId)
           if (!resizingElement) {
             throw new Error(
               'You are trying to resize an non-exist element in the current snapshot!!'
@@ -747,7 +750,9 @@ export function createPointerHandlers({
                 x2: resizingElement.x2,
                 y2: resizingElement.y2,
               })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+              replaceCurrentSnapshotByReplacingElements({
+                replacedElement: { ...newElementWithoutId, id: resizingElementId },
+              })
               dispatch({
                 type: validAction[uiState.state].continueResize,
                 data: { ...uiState.data },
@@ -761,7 +766,9 @@ export function createPointerHandlers({
                 x2: sceneX,
                 y2: sceneY,
               })
-              replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+              replaceCurrentSnapshotByReplacingElements({
+                replacedElement: { ...newElementWithoutId, id: resizingElementId },
+              })
               dispatch({
                 type: validAction[uiState.state].continueResize,
                 data: { ...uiState.data },
@@ -781,7 +788,9 @@ export function createPointerHandlers({
               pointerStartedAt: uiState.data.pointerPosition,
               rectElementToResize: resizingElement,
             })
-            replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+            replaceCurrentSnapshotByReplacingElements({
+              replacedElement: { ...newElementWithoutId, id: resizingElementId },
+            })
             dispatch({
               type: validAction[uiState.state].continueResize,
               data: { ...uiState.data },
@@ -793,7 +802,9 @@ export function createPointerHandlers({
               pointerStartedAt: uiState.data.pointerPosition,
               imageElementToResize: resizingElement,
             })
-            replaceCurrentSnapshot({ replacedElement: { ...newElementWithoutId, id: index } })
+            replaceCurrentSnapshotByReplacingElements({
+              replacedElement: { ...newElementWithoutId, id: resizingElementId },
+            })
             dispatch({
               type: validAction[uiState.state].continueResize,
               data: { ...uiState.data },
@@ -810,24 +821,24 @@ export function createPointerHandlers({
 
           // adjust coordinates to handle the case when resizing flips the rectangle
           if (uiState.data.elementType === 'rectangle') {
-            const selectedIndex = uiState.data.elementId
-            const selectedElement = elementsSnapshot[selectedIndex]
-            if (!selectedElement || selectedElement.type !== 'rectangle') {
+            const resizingElementId = uiState.data.elementId
+            const resizingElement = getElementInCurrentSnapshot(resizingElementId)
+            if (!resizingElement || resizingElement.type !== 'rectangle') {
               throw new Error('The resizing element is not a "rectangle" element')
             }
-            const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(selectedElement)
+            const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(resizingElement)
             const newElementWithoutId = createRectangleElementWithoutId({
               x1: newX1,
               y1: newY1,
               width: newX2 - newX1,
               height: newY2 - newY1,
             })
-            replaceCurrentSnapshot({
-              replacedElement: { ...newElementWithoutId, id: selectedIndex },
+            replaceCurrentSnapshotByReplacingElements({
+              replacedElement: { ...newElementWithoutId, id: resizingElementId },
             })
             dispatch({
               type: validAction[uiState.state].selectSingleElement,
-              data: { elementId: uiState.data.elementId },
+              data: { elementId: resizingElementId },
             })
             return
           }
@@ -848,7 +859,7 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
           const selected = getFirstElementAtPosition({
-            elementsSnapshot,
+            elementsSnapshot: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
@@ -930,7 +941,7 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
           const selected = getFirstElementAtPosition({
-            elementsSnapshot,
+            elementsSnapshot: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
@@ -954,9 +965,10 @@ export function createPointerHandlers({
           }
 
           // find out if a pointer down hits on one of the current selected elements or not
-          const currentSelectedElements = uiState.data.elementIds
-            .map((selectedId) => elementsSnapshot[selectedId])
-            .filter((element): element is TElementData => Boolean(element))
+          const currentSelectedElements = getElementsInSnapshot(
+            currentSnapshot,
+            uiState.data.elementIds
+          )
           const firstSelectedAtPointer = getFirstElementAtPosition({
             elementsSnapshot: currentSelectedElements,
             xPosition: sceneX,

@@ -1,10 +1,5 @@
 import { useState } from 'react'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from './App'
+import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 
 function createPencilElementWithoutId({
   newX,
@@ -39,9 +34,9 @@ function updatePencilElement({
 
 export function CanvasForPencil({
   renderCanvas,
-  elementsSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
 }: {
   renderCanvas: (arg: {
@@ -49,9 +44,9 @@ export function CanvasForPencil({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  elementsSnapshot: TSnapshot
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
   commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -92,7 +87,7 @@ export function CanvasForPencil({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = elementsSnapshot[uiState.data.elementId]
+      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
       if (!drawingElement || drawingElement.type !== 'pencil') {
         throw new Error(
           'The drawing element in the current snapshot is missing or not a "pencil" element'
@@ -104,7 +99,7 @@ export function CanvasForPencil({
         newY: sceneY,
         currentPoints: drawingElement.points,
       })
-      replaceCurrentSnapshot({ replacedElement: newElement })
+      replaceCurrentSnapshotByReplacingElements({ replacedElement: newElement })
       return
     }
   }

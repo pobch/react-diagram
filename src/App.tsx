@@ -42,10 +42,6 @@ export type TElementData =
       }[]
     }
   | {
-      type: 'removed'
-      id: number
-    }
-  | {
       type: 'image'
       id: number
       x1: number
@@ -80,32 +76,41 @@ function useHistory() {
     throw new Error('The whole current snapshot is not exist in this point of history!!')
   }
 
+  function getElementInCurrentSnapshot(elementId: number) {
+    if (!currentSnapshot) {
+      throw new Error('The whole current snapshot is not exist in this point of history!!')
+    }
+    return currentSnapshot.find((element) => element.id === elementId)
+  }
+
   function commitNewSnapshot(options: TCommitNewSnapshotParam) {
     if (!currentSnapshot) {
       throw new Error('The whole current snapshot is not exist in this point of history!!')
     }
-    let newSnapshot: TSnapshot
+    let newSnapshot: TSnapshot = []
     if (options.mode === 'clone') {
       newSnapshot = [...currentSnapshot]
     } else if (options.mode === 'addElement') {
       const newElement = {
         ...options.newElementWithoutId,
-        id: currentSnapshot.length,
+        id: Date.now(),
       }
       newSnapshot = [...currentSnapshot, newElement]
     } else if (options.mode === 'removeElements') {
       newSnapshot = [...currentSnapshot]
+      let willRemoveIdsMap: Record<number, boolean> = {}
       options.elementIds.forEach((elementId) => {
-        newSnapshot[elementId] = {
-          id: elementId,
-          type: 'removed',
-        }
+        willRemoveIdsMap[elementId] = true
+      })
+      newSnapshot = newSnapshot.filter((element) => {
+        return !willRemoveIdsMap[element.id]
       })
     } else if (options.mode === 'removeAllElement') {
       newSnapshot = []
     } else if (options.mode === 'modifyElement') {
       newSnapshot = [...currentSnapshot]
-      newSnapshot[options.modifiedElement.id] = { ...options.modifiedElement }
+      const index = newSnapshot.findIndex((element) => element.id === options.modifiedElement.id)
+      newSnapshot[index] = { ...options.modifiedElement }
     }
     setHistory((prevHistory) => {
       const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
@@ -115,12 +120,14 @@ function useHistory() {
 
     // for "addElement" mode, we also return new element's id
     if (options.mode === 'addElement') {
-      return currentSnapshot.length
+      const lastElementInNewSnapshot = newSnapshot.at(-1)
+      if (!lastElementInNewSnapshot) throw new Error('The new snapshot is empty!!')
+      return lastElementInNewSnapshot.id
     }
     return
   }
 
-  function replaceCurrentSnapshot({
+  function replaceCurrentSnapshotByReplacingElements({
     replacedElement,
     replacedMultiElements,
   }: TReplaceCurrentSnapshotParam) {
@@ -135,18 +142,38 @@ function useHistory() {
     }
     if (replacedElement) {
       let newSnapshot = [...currentSnapshot]
-      newSnapshot[replacedElement.id] = { ...replacedElement }
+      const index = newSnapshot.findIndex((element) => element.id === replacedElement.id)
+      newSnapshot[index] = { ...replacedElement }
       setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
       return
     }
     if (replacedMultiElements) {
       let newSnapshot = [...currentSnapshot]
-      replacedMultiElements.forEach((replacedElement) => {
-        newSnapshot[replacedElement.id] = { ...replacedElement }
+      const willReplaceElementsMap = replacedMultiElements.reduce((prev, element) => {
+        prev[element.id] = { ...element }
+        return prev
+      }, {} as Record<number, TElementData>)
+      newSnapshot = newSnapshot.map((element) => {
+        const willReplaceElement = willReplaceElementsMap[element.id]
+        if (willReplaceElement) {
+          return { ...willReplaceElement }
+        }
+        return element
       })
       setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
       return
     }
+  }
+
+  function replaceCurrentSnapshotByRemovingElement(elementIdToRemove: number) {
+    if (!currentSnapshot) {
+      throw new Error('The whole current snapshot is not exist in this point of history!!')
+    }
+    let newSnapshot = [...currentSnapshot]
+    const index = newSnapshot.findIndex((element) => element.id === elementIdToRemove)
+    newSnapshot.splice(index, 1)
+    setHistory((prevHistory) => [...prevHistory.slice(0, currentIndex), newSnapshot])
+    return
   }
 
   function undo() {
@@ -172,9 +199,11 @@ function useHistory() {
   }
 
   return {
-    elementsSnapshot: currentSnapshot,
+    currentSnapshot,
+    getElementInCurrentSnapshot,
     commitNewSnapshot,
-    replaceCurrentSnapshot,
+    replaceCurrentSnapshotByReplacingElements,
+    replaceCurrentSnapshotByRemovingElement,
     undo,
     redo,
     DEBUG_importSnapshot,
@@ -210,9 +239,11 @@ export type TTool = 'selection' | 'line' | 'rectangle' | 'pencil' | 'text' | 'ha
 export function App() {
   const [tool, setTool] = useState<TTool>('selection')
   const {
-    elementsSnapshot,
+    currentSnapshot,
+    getElementInCurrentSnapshot,
     commitNewSnapshot,
-    replaceCurrentSnapshot,
+    replaceCurrentSnapshotByReplacingElements,
+    replaceCurrentSnapshotByRemovingElement,
     undo,
     redo,
     DEBUG_importSnapshot,
@@ -229,11 +260,11 @@ export function App() {
     function FOR_DEBUG() {
       // not support image element
       ;(window as any).exportSnapshot = () => {
-        return elementsSnapshot
+        return currentSnapshot
       }
       ;(window as any).importSnapshot = DEBUG_importSnapshot
     },
-    [DEBUG_importSnapshot, elementsSnapshot]
+    [DEBUG_importSnapshot, currentSnapshot]
   )
 
   // * ----------- Clear Canvas -------------
@@ -269,7 +300,7 @@ export function App() {
       // context.strokeRect(0, 0, canvas.width / zoomLevel, canvas.height / zoomLevel)
 
       const roughCanvas = rough.canvas(canvas, { options: { seed: CONFIG.SEED } })
-      elementsSnapshot.forEach((element) => {
+      currentSnapshot.forEach((element) => {
         if (element.type === 'line' || element.type === 'rectangle' || element.type === 'arrow') {
           element.roughElements.forEach((roughElement) => {
             roughCanvas.draw(roughElement)
@@ -286,8 +317,6 @@ export function App() {
             if (!line) continue
             context.fillText(line.lineContent, line.lineX1, line.lineY1)
           }
-        } else if (element.type === 'removed') {
-          // don't draw
         } else if (element.type === 'image') {
           context.drawImage(
             element.data,
@@ -308,7 +337,7 @@ export function App() {
 
       context.restore()
     },
-    [elementsSnapshot, originOffset.x, originOffset.y, zoomLevel]
+    [currentSnapshot, originOffset.x, originOffset.y, zoomLevel]
   )
 
   useLayoutEffect(() => {
@@ -517,9 +546,12 @@ export function App() {
             return (
               <CanvasForSelection
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                currentSnapshot={currentSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 drawScene={drawScene}
               />
@@ -528,9 +560,11 @@ export function App() {
             return (
               <CanvasForRect
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
@@ -538,9 +572,11 @@ export function App() {
             return (
               <CanvasForLinear
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 lineType="line"
               />
@@ -549,9 +585,11 @@ export function App() {
             return (
               <CanvasForPencil
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
               />
             )
@@ -559,9 +597,13 @@ export function App() {
             return (
               <CanvasForText
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                currentSnapshot={currentSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
+                replaceCurrentSnapshotByRemovingElement={replaceCurrentSnapshotByRemovingElement}
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
                 zoomLevel={zoomLevel}
@@ -579,9 +621,11 @@ export function App() {
             return (
               <CanvasForLinear
                 renderCanvas={renderCanvas}
-                elementsSnapshot={elementsSnapshot}
+                getElementInCurrentSnapshot={getElementInCurrentSnapshot}
                 commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshot={replaceCurrentSnapshot}
+                replaceCurrentSnapshotByReplacingElements={
+                  replaceCurrentSnapshotByReplacingElements
+                }
                 viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
                 lineType="arrow"
               />
