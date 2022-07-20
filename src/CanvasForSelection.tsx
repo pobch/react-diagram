@@ -310,6 +310,8 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
   }
 }
 
+// * -------------------------- Helpers --------------------------
+
 function getSelectedElementIdsFromState(uiState: TUiState) {
   let elementIds: number[] = []
 
@@ -332,6 +334,22 @@ function getSelectedElementIdsFromState(uiState: TUiState) {
   return elementIds
 }
 
+export function getElementsInSnapshot(
+  elementsSnapshot: TSnapshot,
+  elementIds: number[]
+): TElementData[] {
+  const elementIdsMap = elementIds.reduce((prev, elementId) => {
+    prev[elementId] = true
+    return prev
+  }, {} as { [elementId: number]: boolean })
+  const foundElementsInSnapshot = elementsSnapshot.filter((element) => {
+    return elementIdsMap[element.id]
+  })
+  return foundElementsInSnapshot
+}
+
+// * -------------------------- End ------------------------------
+
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 
 /**
@@ -341,9 +359,10 @@ export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
  */
 export function CanvasForSelection({
   renderCanvas,
-  elementsSnapshot,
+  currentSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
   drawScene,
 }: {
@@ -353,9 +372,10 @@ export function CanvasForSelection({
     onPointerUp: (e: React.PointerEvent) => void
     styleCursor: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
   }) => React.ReactElement
-  elementsSnapshot: TSnapshot
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => void
+  currentSnapshot: TSnapshot
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -373,21 +393,6 @@ export function CanvasForSelection({
   // useLayoutEffect() in the parent will be ignored in case of a selection tool.
   // ... Therefore, all canvas drawing logics need to be here instead.
   useLayoutEffect(() => {
-    // -------- Helper ---------
-    function getElementsInSnapshot(elementIds: number[]): TElementData[] {
-      const elementsInSnapshot = elementIds
-        .map((elementId) => {
-          const elementInSnapshot = elementsSnapshot[elementId]
-          return elementInSnapshot
-        })
-        .filter((elementInSnapshot): elementInSnapshot is TElementData =>
-          Boolean(elementInSnapshot)
-        )
-
-      return elementsInSnapshot
-    }
-    // ------------------------------
-
     // all state we want to draw dashed lines
     if (
       uiState.state === 'readyToMove' ||
@@ -400,7 +405,7 @@ export function CanvasForSelection({
     ) {
       const selectedElementIds = getSelectedElementIdsFromState(uiState)
       let extraElements: (TElementData | TAreaSelectData['rectangleSelector'])[] =
-        getElementsInSnapshot(selectedElementIds)
+        getElementsInSnapshot(currentSnapshot, selectedElementIds)
 
       // also draw rectangle selector (if exist)
       if (uiState.state === 'areaSelecting') {
@@ -544,7 +549,7 @@ export function CanvasForSelection({
     // all other state have no extra dashed lines, just normally draw the snapshot
     drawScene()
     return
-  }, [uiState, drawScene, elementsSnapshot])
+  }, [uiState, drawScene, currentSnapshot])
 
   // ?? Is there any better approach
   // Reset uiState when it is holding an element's id that is not being drawn in the canvas.
@@ -554,7 +559,7 @@ export function CanvasForSelection({
   //    to the point that does not have this element at all, but uiState is still holding the element id)
   // Case#2:
   // 1. Click to select any element
-  // 2. Click a remove button (the snapshot changes the element's type to "removed" and skip drawing it,
+  // 2. Click a remove button (the selected element got removed from the snapshot,
   //    but uiState still holding its id)
   // TODO: A Better approach:
   // 1. In the parent component, set `key` for this component to equal to the history index
@@ -573,25 +578,15 @@ export function CanvasForSelection({
       uiState.state === 'multiElementSelected'
     ) {
       const selectedElementIds = getSelectedElementIdsFromState(uiState)
-
-      let hasUnmatchElementInSnapshot = false
-      for (let elementId of selectedElementIds) {
-        const selectedElementInSnapshot = elementsSnapshot[elementId]
-        const hasElementInSnapshot =
-          selectedElementInSnapshot && selectedElementInSnapshot.type !== 'removed'
-        if (hasElementInSnapshot) {
-          continue
-        } else {
-          hasUnmatchElementInSnapshot = true
-          break
-        }
-      }
+      const selectedElementsInSnapshot = getElementsInSnapshot(currentSnapshot, selectedElementIds)
+      let hasUnmatchElementInSnapshot =
+        selectedElementIds.length !== selectedElementsInSnapshot.length
 
       if (hasUnmatchElementInSnapshot) {
         dispatch({ type: validAction[uiState.state].reset })
       }
     }
-  }, [uiState, elementsSnapshot])
+  }, [uiState, currentSnapshot])
 
   const [cursorType, setCursorType] = useState<TCursorType>('default')
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
@@ -599,9 +594,10 @@ export function CanvasForSelection({
   const { handlePointerDown, handlePointerMove, handlePointerUp } = createPointerHandlers({
     uiState,
     dispatch,
-    elementsSnapshot,
+    currentSnapshot,
+    getElementInCurrentSnapshot,
     commitNewSnapshot,
-    replaceCurrentSnapshot,
+    replaceCurrentSnapshotByReplacingElements,
     viewportCoordsToSceneCoords,
     setCursorType,
     canvasForMeasureRef,

@@ -82,9 +82,11 @@ export function createTextElementWithoutId({
 
 export function CanvasForText({
   renderCanvas,
-  elementsSnapshot,
+  currentSnapshot,
+  getElementInCurrentSnapshot,
   commitNewSnapshot,
-  replaceCurrentSnapshot,
+  replaceCurrentSnapshotByReplacingElements,
+  replaceCurrentSnapshotByRemovingElement,
   viewportCoordsToSceneCoords,
   sceneCoordsToViewportCoords,
   zoomLevel,
@@ -94,9 +96,11 @@ export function CanvasForText({
     onClick: (e: React.MouseEvent) => void
     styleCursor: 'default' | 'text'
   }) => React.ReactElement
-  elementsSnapshot: TSnapshot
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => void
-  replaceCurrentSnapshot: (arg: TReplaceCurrentSnapshotParam) => number | void
+  currentSnapshot: TSnapshot
+  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
+  replaceCurrentSnapshotByRemovingElement: (elementId: number) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
@@ -149,7 +153,7 @@ export function CanvasForText({
       viewportY: e.clientY,
     })
     const firstFoundTextElement = getTextElementAtPosition({
-      elementsSnapshot,
+      elementsSnapshot: currentSnapshot,
       xPosition: sceneX,
       yPosition: sceneY,
     })
@@ -175,7 +179,7 @@ export function CanvasForText({
       })
 
       const firstFoundTextElement = getTextElementAtPosition({
-        elementsSnapshot,
+        elementsSnapshot: currentSnapshot,
         xPosition: sceneX,
         yPosition: sceneY,
       })
@@ -254,7 +258,7 @@ export function CanvasForText({
       const newContent = (textareaRef.current?.value ?? '').trim()
 
       if (!newContent) {
-        replaceCurrentSnapshot({ replacedElement: { id: uiState.data.elementId, type: 'removed' } })
+        replaceCurrentSnapshotByRemovingElement(uiState.data.elementId)
         setUiState({ state: 'none' })
         return
       }
@@ -266,7 +270,7 @@ export function CanvasForText({
         y1: uiState.data.textareaY1,
         isWriting: false,
       })
-      replaceCurrentSnapshot({
+      replaceCurrentSnapshotByReplacingElements({
         replacedElement: { ...newElementWithoutId, id: uiState.data.elementId },
       })
       setUiState({ state: 'none' })
@@ -397,13 +401,13 @@ export function CanvasForText({
                   onBlur={() => {
                     // keep state untouched, just make sure `isWriting` is always `true` after blur
                     if (uiState.state === 'updating') {
-                      const editingElement = elementsSnapshot[uiState.data.elementId]
+                      const editingElement = getElementInCurrentSnapshot(uiState.data.elementId)
                       if (!editingElement || editingElement.type !== 'text') {
                         throw new Error(
                           'The editing element is missing in the current history or not a "text" element'
                         )
                       }
-                      replaceCurrentSnapshot({
+                      replaceCurrentSnapshotByReplacingElements({
                         replacedElement: { ...editingElement, isWriting: false },
                       })
                       return
