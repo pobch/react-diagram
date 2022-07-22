@@ -1,3 +1,4 @@
+/* eslint-disable no-extra-label */
 import * as React from 'react'
 import {
   TCommitNewSnapshotParam,
@@ -20,20 +21,23 @@ import { createTextElementWithoutId, getTextElementAtPosition } from '../CanvasF
 import { moveImageElement, moveRectangleElement } from './moveHelpers'
 import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
 
-function getFirstElementAtPosition({
-  elementsSnapshot,
+function getLastElementAtPosition({
+  elementsSource,
   xPosition,
   yPosition,
 }: {
-  elementsSnapshot: TElementData[]
+  elementsSource: TElementData[]
   xPosition: number
   yPosition: number
 }):
   | {
-      pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br' | 'onLine' | 'inside' | 'none'
-      firstFoundElement: TElementData
+      pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br' | 'onLine' | 'inside'
+      foundLastElement: TElementData
     }
-  | undefined {
+  | {
+      pointerPosition: 'notFound'
+      foundLastElement: undefined
+    } {
   // * ----------------- Helpers --------------------
 
   // find the distance between 2 points
@@ -83,25 +87,34 @@ function getFirstElementAtPosition({
   }
   // * ------------------ End ------------------------
 
-  // in case of not found, it will be undefined
-  let firstFoundElement: TElementData | undefined = undefined
-  let pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br' | 'onLine' | 'inside' | 'none' =
-    'none'
+  // in case of not found, these values will be undefined + 'notFound'
+  let foundLastElement: TElementData | undefined = undefined
+  let pointerPosition:
+    | 'start'
+    | 'end'
+    | 'tl'
+    | 'tr'
+    | 'bl'
+    | 'br'
+    | 'onLine'
+    | 'inside'
+    | 'notFound' = 'notFound'
 
-  // 1st loop
-  for (let element of elementsSnapshot) {
+  allElementsLoop: for (let i = elementsSource.length - 1; i >= 0; i--) {
+    const element = elementsSource[i]!
+
     if (element.type === 'line' || element.type === 'arrow') {
       // check if a pointer is at (x1, y1)
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'start'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is at (x2, y2)
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'end'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is on the line
       else if (
@@ -114,35 +127,35 @@ function getFirstElementAtPosition({
           y2Line: element.y2,
         })
       ) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'onLine'
-        break // 1st loop
+        break allElementsLoop
       }
-      continue // 1st loop
+      continue allElementsLoop
     } else if (element.type === 'rectangle' || element.type === 'image') {
       // check if a pointer is at top-left
       if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y1 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'tl'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is at top-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y1 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'tr'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is at bottom-right
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x2, yPoint: element.y2 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'br'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is at bottom-left
       else if (isNearPoint({ xPosition, yPosition, xPoint: element.x1, yPoint: element.y2 })) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'bl'
-        break // 1st loop
+        break allElementsLoop
       }
       // check if a pointer is on the line of rectangle
       else if (
@@ -179,9 +192,9 @@ function getFirstElementAtPosition({
           y2Line: element.y1,
         })
       ) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'onLine'
-        break // 1st loop
+        break allElementsLoop
       }
       // TODO: Also check if a pointer is inside the rectangle after we support filled rectangle
       else if (
@@ -192,15 +205,14 @@ function getFirstElementAtPosition({
         element.y1 < yPosition &&
         yPosition < element.y2
       ) {
-        firstFoundElement = element
+        foundLastElement = element
         pointerPosition = 'inside'
-        break // 1st loop
+        break allElementsLoop
       }
 
-      continue // 1st loop
+      continue allElementsLoop
     } else if (element.type === 'pencil') {
-      // 2nd loop
-      for (let i = 0; i < element.points.length - 1; i++) {
+      pencilElementLoop: for (let i = 0; i < element.points.length - 1; i++) {
         const currentPoint = element.points[i]
         const nextPoint = element.points[i + 1]
         if (!currentPoint || !nextPoint) {
@@ -217,39 +229,42 @@ function getFirstElementAtPosition({
             threshold: 6,
           })
         ) {
-          firstFoundElement = element
+          foundLastElement = element
           pointerPosition = 'onLine'
           // found an element while looping through points of a single element
-          break // 2nd loop
+          break pencilElementLoop
         } else {
-          continue // 2nd loop
+          continue pencilElementLoop
         }
       }
 
       // finished looping through points of a single element
-      // if we found an element(i.e. the first element underneath a pointer), we can stop looping through remaining elements
-      if (firstFoundElement) {
-        break // 1st loop
+      // if we found an element(i.e. the last element underneath a pointer), we can stop looping through remaining elements
+      if (foundLastElement) {
+        break allElementsLoop
       } else {
-        continue // 1st loop
+        continue allElementsLoop
       }
     } else if (element.type === 'text') {
-      firstFoundElement = getTextElementAtPosition({
+      foundLastElement = getTextElementAtPosition({
         elementsSnapshot: [element],
         xPosition,
         yPosition,
       })
-      if (firstFoundElement) {
+      if (foundLastElement) {
         pointerPosition = 'inside'
-        break // 1st loop
+        break allElementsLoop
       } else {
-        continue // 1st loop
+        continue allElementsLoop
       }
     }
   }
 
-  if (!firstFoundElement) return
-  return { pointerPosition, firstFoundElement }
+  if (!foundLastElement) return { pointerPosition: 'notFound', foundLastElement: undefined }
+  if (foundLastElement && pointerPosition !== 'notFound')
+    return { pointerPosition, foundLastElement }
+  // Should not reach here
+  throw new Error('Impossible state: Found an element but the pointer position is "notFound"')
 }
 
 function getAllElementIdsInsideRectSelector({
@@ -374,22 +389,22 @@ export function createPointerHandlers({
 
     // cursor UI for all uiState
     // TODO: Add state guard and separate cursor between "none" and other state
-    const hovered = getFirstElementAtPosition({
-      elementsSnapshot: currentSnapshot,
+    const { pointerPosition: hoveringPosition } = getLastElementAtPosition({
+      elementsSource: currentSnapshot,
       xPosition: sceneX,
       yPosition: sceneY,
     })
-    if (!hovered) {
+    if (hoveringPosition === 'notFound') {
       setCursorType('default')
-    } else if (hovered.pointerPosition === 'onLine' || hovered.pointerPosition === 'inside') {
+    } else if (hoveringPosition === 'onLine' || hoveringPosition === 'inside') {
       setCursorType('move')
-    } else if (hovered.pointerPosition === 'tr' || hovered.pointerPosition === 'bl') {
+    } else if (hoveringPosition === 'tr' || hoveringPosition === 'bl') {
       setCursorType('nesw-resize')
     } else if (
-      hovered.pointerPosition === 'start' ||
-      hovered.pointerPosition === 'end' ||
-      hovered.pointerPosition === 'tl' ||
-      hovered.pointerPosition === 'br'
+      hoveringPosition === 'start' ||
+      hoveringPosition === 'end' ||
+      hoveringPosition === 'tl' ||
+      hoveringPosition === 'br'
     ) {
       setCursorType('nwse-resize')
     } else {
@@ -406,14 +421,15 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
 
-          const selectedData = getFirstElementAtPosition({
-            elementsSnapshot: currentSnapshot,
+          const hitPoint = getLastElementAtPosition({
+            elementsSource: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
+          const isHit = hitPoint.pointerPosition !== 'notFound'
 
           // pointer down does not hit on any elements
-          if (!selectedData) {
+          if (!isHit) {
             dispatch({
               type: validAction[uiState.state].dragSelect,
               data: {
@@ -434,7 +450,7 @@ export function createPointerHandlers({
           dispatch({
             type: validAction[uiState.state].prepareMove,
             data: createMoveDataArray({
-              targetElements: [selectedData.firstFoundElement],
+              targetElements: [hitPoint.foundLastElement],
               pointerX: sceneX,
               pointerY: sceneY,
             }),
@@ -858,14 +874,15 @@ export function createPointerHandlers({
             viewportX: e.clientX,
             viewportY: e.clientY,
           })
-          const selected = getFirstElementAtPosition({
-            elementsSnapshot: currentSnapshot,
+          const hitPoint = getLastElementAtPosition({
+            elementsSource: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
+          const isHit = hitPoint.pointerPosition !== 'notFound'
 
           // pointer down does not hit on any elements
-          if (!selected) {
+          if (!isHit) {
             dispatch({
               type: validAction[uiState.state].dragSelect,
               data: {
@@ -882,12 +899,13 @@ export function createPointerHandlers({
             return
           }
           // pointer down hits a different element than the current selected element
-          if (selected.firstFoundElement.id !== uiState.data.elementId) {
+          const isHitOnUnselectedElement = hitPoint.foundLastElement.id !== uiState.data.elementId
+          if (isHitOnUnselectedElement) {
             // allow to move only
             dispatch({
               type: validAction[uiState.state].prepareMove,
               data: createMoveDataArray({
-                targetElements: [selected.firstFoundElement],
+                targetElements: [hitPoint.foundLastElement],
                 pointerX: sceneX,
                 pointerY: sceneY,
               }),
@@ -898,32 +916,32 @@ export function createPointerHandlers({
           // pointer down hits on the current selected element
           // we allow to either move or resize an element
           // ... so, we need to check which part of the element was clicked
-          if (selected.pointerPosition === 'onLine' || selected.pointerPosition === 'inside') {
+          if (hitPoint.pointerPosition === 'onLine' || hitPoint.pointerPosition === 'inside') {
             dispatch({
               type: validAction[uiState.state].prepareMove,
               data: createMoveDataArray({
-                targetElements: [selected.firstFoundElement],
+                targetElements: [hitPoint.foundLastElement],
                 pointerX: sceneX,
                 pointerY: sceneY,
               }),
             })
           } else if (
-            selected.pointerPosition === 'start' ||
-            selected.pointerPosition === 'end' ||
-            selected.pointerPosition === 'tl' ||
-            selected.pointerPosition === 'tr' ||
-            selected.pointerPosition === 'br' ||
-            selected.pointerPosition === 'bl'
+            hitPoint.pointerPosition === 'start' ||
+            hitPoint.pointerPosition === 'end' ||
+            hitPoint.pointerPosition === 'tl' ||
+            hitPoint.pointerPosition === 'tr' ||
+            hitPoint.pointerPosition === 'br' ||
+            hitPoint.pointerPosition === 'bl'
           ) {
             dispatch({
               type: validAction[uiState.state].prepareResize,
               data: createResizeData({
-                targetElement: selected.firstFoundElement,
-                pointerPosition: selected.pointerPosition,
+                targetElement: hitPoint.foundLastElement,
+                pointerPosition: hitPoint.pointerPosition,
               }),
             })
           } else {
-            throw new Error(`${selected.pointerPosition} pointer position is not supported`)
+            throw new Error(`${hitPoint.pointerPosition} pointer position is not supported`)
           }
           return
         },
@@ -940,14 +958,15 @@ export function createPointerHandlers({
             viewportX: e.clientX,
             viewportY: e.clientY,
           })
-          const selected = getFirstElementAtPosition({
-            elementsSnapshot: currentSnapshot,
+          const hitPoint = getLastElementAtPosition({
+            elementsSource: currentSnapshot,
             xPosition: sceneX,
             yPosition: sceneY,
           })
+          const isHit = hitPoint.pointerPosition !== 'notFound'
 
           // pointer down does not hit on any elements
-          if (!selected) {
+          if (!isHit) {
             dispatch({
               type: validAction[uiState.state].dragSelect,
               data: {
@@ -969,12 +988,9 @@ export function createPointerHandlers({
             currentSnapshot,
             uiState.data.elementIds
           )
-          const firstSelectedAtPointer = getFirstElementAtPosition({
-            elementsSnapshot: currentSelectedElements,
-            xPosition: sceneX,
-            yPosition: sceneY,
-          })
-          const isPointerHitOneOfSelectedElements = Boolean(firstSelectedAtPointer)
+          const isPointerHitOneOfSelectedElements = currentSelectedElements.some(
+            (selectedElement) => selectedElement.id === hitPoint.foundLastElement.id
+          )
 
           // pointer down hits on the current selected elements
           // we allow to move only
