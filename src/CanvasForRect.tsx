@@ -3,6 +3,7 @@ import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
 import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
+import { singletonThrottle } from './helpers/throttle'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
@@ -72,6 +73,9 @@ export function CanvasForRect({
   >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+    logPointerDown(e, uiState.state)
+
     // should come from onPointerUp() or initial state when mount
     if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
@@ -85,24 +89,31 @@ export function CanvasForRect({
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+    logPointerMove(e, uiState.state)
+
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
-      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
-        viewportX: e.clientX,
-        viewportY: e.clientY,
+      // wrap in throttle because the following code need to be called at most once
+      // https://github.com/pobch/react-diagram/issues/27
+      singletonThrottle(() => {
+        const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+          viewportX: e.clientX,
+          viewportY: e.clientY,
+        })
+        const newElementWithoutId = createRectangleElementWithoutId({
+          x1: uiState.data.pointerDownAtX,
+          y1: uiState.data.pointerDownAtY,
+          width: sceneX - uiState.data.pointerDownAtX,
+          height: sceneY - uiState.data.pointerDownAtY,
+        })
+        const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+        if (newId === undefined) {
+          throw new Error('ID of the drawing rectangle element is missing')
+        }
+        setUiState({ state: 'drawing', data: { elementId: newId } })
+        return
       })
-      const newElementWithoutId = createRectangleElementWithoutId({
-        x1: uiState.data.pointerDownAtX,
-        y1: uiState.data.pointerDownAtY,
-        width: sceneX - uiState.data.pointerDownAtX,
-        height: sceneY - uiState.data.pointerDownAtY,
-      })
-      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
-      if (newId === undefined) {
-        throw new Error('ID of the drawing rectangle element is missing')
-      }
-      setUiState({ state: 'drawing', data: { elementId: newId } })
-      return
     }
     // should come from previous onPointerMove()
     if (uiState.state === 'drawing') {
@@ -133,6 +144,9 @@ export function CanvasForRect({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+    logPointerUp(e, uiState.state)
+
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
       // no drawing occurs, do nothing with history
@@ -168,4 +182,21 @@ export function CanvasForRect({
     onPointerMove: handlePointerMove,
     onPointerUp: handlePointerUp,
   })
+}
+
+// for debug purposes
+function logPointerDown(e: React.PointerEvent, state: string) {
+  console.log('%cpointer down: 🔽', 'background-color: #00c8ff')
+  const { isPrimary, pointerId } = e
+  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
+}
+function logPointerMove(e: React.PointerEvent, state: string) {
+  console.log('pointer move: 🔽')
+  const { isPrimary, pointerId } = e
+  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
+}
+function logPointerUp(e: React.PointerEvent, state: string) {
+  console.log('%cpointer up: 🔽', 'background-color: #00ff37')
+  const { isPrimary, pointerId } = e
+  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
 }

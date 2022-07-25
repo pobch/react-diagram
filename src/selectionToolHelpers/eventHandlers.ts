@@ -18,6 +18,7 @@ import {
   validAction,
 } from '../CanvasForSelection'
 import { createTextElementWithoutId, getTextElementAtPosition } from '../CanvasForText'
+import { singletonThrottle } from '../helpers/throttle'
 import { moveImageElement, moveRectangleElement } from './moveHelpers'
 import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
 
@@ -416,6 +417,8 @@ export function createPointerHandlers({
     case 'none': {
       return {
         handlePointerDown(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
@@ -458,6 +461,8 @@ export function createPointerHandlers({
           return
         },
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
         },
         handlePointerUp(e: React.PointerEvent) {},
@@ -467,6 +472,8 @@ export function createPointerHandlers({
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
 
           // can come from either
@@ -501,6 +508,8 @@ export function createPointerHandlers({
           return
         },
         handlePointerUp(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           // should come from onPointerMove() of the previous same state: 'areaSelecting'
 
           if (uiState.data.selectedElementIds.length >= 2) {
@@ -535,14 +544,22 @@ export function createPointerHandlers({
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
-          handleCursorUI(e)
+          if (!e.isPrimary) return
 
-          // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
-          commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: validAction[uiState.state].startMove, data: [...uiState.data] })
-          return
+          // wrap in throttle because the following code need to be called at most once
+          // https://github.com/pobch/react-diagram/issues/27
+          singletonThrottle(() => {
+            handleCursorUI(e)
+
+            // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
+            commitNewSnapshot({ mode: 'clone' })
+            dispatch({ type: validAction[uiState.state].startMove, data: [...uiState.data] })
+            return
+          })
         },
         handlePointerUp(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           // Should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
           // ... in the case that onPointerMove() is not triggered at all.
           // This means the selected element(s) is not actually move.
@@ -572,6 +589,8 @@ export function createPointerHandlers({
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
 
           // can come from either
@@ -682,6 +701,8 @@ export function createPointerHandlers({
           return
         },
         handlePointerUp(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           // should come from onPointerMove() of the same previous same state: 'moving'
           if (uiState.data.length === 0) {
             throw new Error(
@@ -709,14 +730,22 @@ export function createPointerHandlers({
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
-          handleCursorUI(e)
+          if (!e.isPrimary) return
 
-          // should come from onPointerDown() of 'singleElementSelected' state
-          commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: validAction[uiState.state].startResize, data: { ...uiState.data } })
-          return
+          // wrap in throttle because the following code need to be called at most once
+          // https://github.com/pobch/react-diagram/issues/27
+          singletonThrottle(() => {
+            handleCursorUI(e)
+
+            // should come from onPointerDown() of 'singleElementSelected' state
+            commitNewSnapshot({ mode: 'clone' })
+            dispatch({ type: validAction[uiState.state].startResize, data: { ...uiState.data } })
+            return
+          })
         },
         handlePointerUp(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           // Should come from onPointerDown() of 'singleElementSelected' state
           // ... in the case that onPointerMove() is not triggered at all.
           // This means the selected element is not actually resize.
@@ -734,6 +763,8 @@ export function createPointerHandlers({
       return {
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
 
           // can come from either
@@ -833,6 +864,8 @@ export function createPointerHandlers({
           }
         },
         handlePointerUp(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           // should come from onPointerMove() of the same previous same state: 'resizing'
 
           // adjust coordinates to handle the case when resizing flips the rectangle
@@ -870,6 +903,8 @@ export function createPointerHandlers({
     case 'singleElementSelected': {
       return {
         handlePointerDown(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
@@ -946,6 +981,8 @@ export function createPointerHandlers({
           return
         },
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
         },
         handlePointerUp(e: React.PointerEvent) {},
@@ -954,6 +991,8 @@ export function createPointerHandlers({
     case 'multiElementSelected': {
       return {
         handlePointerDown(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           const { sceneX, sceneY } = viewportCoordsToSceneCoords({
             viewportX: e.clientX,
             viewportY: e.clientY,
@@ -1015,6 +1054,8 @@ export function createPointerHandlers({
           }
         },
         handlePointerMove(e: React.PointerEvent) {
+          if (!e.isPrimary) return
+
           handleCursorUI(e)
         },
         handlePointerUp(e: React.PointerEvent) {},
