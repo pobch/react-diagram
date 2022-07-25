@@ -24,6 +24,8 @@ export function CanvasForHand({
   const [cursorType, setCursorType] = useState<'grab' | 'grabbing'>('grab')
 
   function handlePointerDown(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     if (actionState.action === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
@@ -36,6 +38,8 @@ export function CanvasForHand({
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     if (actionState.action === 'panning') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
         viewportX: e.clientX,
@@ -50,6 +54,8 @@ export function CanvasForHand({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     if (actionState.action === 'panning') {
       setActionState({ action: 'none' })
       setCursorType('grab')

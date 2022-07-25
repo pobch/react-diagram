@@ -74,7 +74,6 @@ export function CanvasForRect({
 
   function handlePointerDown(e: React.PointerEvent) {
     if (!e.isPrimary) return
-    logPointerDown(e, uiState.state)
 
     // should come from onPointerUp() or initial state when mount
     if (uiState.state === 'none') {
@@ -90,7 +89,6 @@ export function CanvasForRect({
 
   function handlePointerMove(e: React.PointerEvent) {
     if (!e.isPrimary) return
-    logPointerMove(e, uiState.state)
 
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
@@ -145,7 +143,6 @@ export function CanvasForRect({
 
   function handlePointerUp(e: React.PointerEvent) {
     if (!e.isPrimary) return
-    logPointerUp(e, uiState.state)
 
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
@@ -182,21 +179,4 @@ export function CanvasForRect({
     onPointerMove: handlePointerMove,
     onPointerUp: handlePointerUp,
   })
-}
-
-// for debug purposes
-function logPointerDown(e: React.PointerEvent, state: string) {
-  console.log('%cpointer down: 🔽', 'background-color: #00c8ff')
-  const { isPrimary, pointerId } = e
-  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
-}
-function logPointerMove(e: React.PointerEvent, state: string) {
-  console.log('pointer move: 🔽')
-  const { isPrimary, pointerId } = e
-  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
-}
-function logPointerUp(e: React.PointerEvent, state: string) {
-  console.log('%cpointer up: 🔽', 'background-color: #00ff37')
-  const { isPrimary, pointerId } = e
-  console.log(`state: ${state}, pointerId: ${pointerId}, isPrimary: ${isPrimary}`)
 }

@@ -57,6 +57,8 @@ export function CanvasForPencil({
   >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerUp() or initial state when mount
     if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
@@ -80,6 +82,8 @@ export function CanvasForPencil({
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerDown() or previous onPointerMove()
     if (uiState.state === 'drawing') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
@@ -105,6 +109,8 @@ export function CanvasForPencil({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
       setUiState({ state: 'none' })

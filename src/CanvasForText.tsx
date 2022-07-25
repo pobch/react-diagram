@@ -143,6 +143,8 @@ export function CanvasForText({
   const [cursorType, setCursorType] = useState<'default' | 'text'>('default')
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     if (uiState.state === 'creating' || uiState.state === 'updating') {
       setCursorType('default')
       return
