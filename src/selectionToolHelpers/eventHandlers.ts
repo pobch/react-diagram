@@ -702,6 +702,8 @@ export function createPointerHandlers({
         },
         handlePointerUp(e: React.PointerEvent) {
           if (!e.isPrimary) return
+          // reset the throttle timer that comes from the previous state's onPointerMove()
+          singletonThrottle.cancel()
 
           // should come from onPointerMove() of the same previous same state: 'moving'
           if (uiState.data.length === 0) {
@@ -865,6 +867,8 @@ export function createPointerHandlers({
         },
         handlePointerUp(e: React.PointerEvent) {
           if (!e.isPrimary) return
+          // reset the throttle timer that comes from the previous state's onPointerMove()
+          singletonThrottle.cancel()
 
           // should come from onPointerMove() of the same previous same state: 'resizing'
 

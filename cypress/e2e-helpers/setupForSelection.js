@@ -38,20 +38,24 @@ export function createAllElements() {
     .trigger('pointerdown', {
       clientX: line.startX,
       clientY: line.startY,
+      isPrimary: true,
     })
     // in the middle
     .trigger('pointermove', {
       clientX: line.middleX,
       clientY: line.middleY,
+      isPrimary: true,
     })
     // end
     .trigger('pointermove', {
       clientX: line.endX,
       clientY: line.endY,
+      isPrimary: true,
     })
     .trigger('pointerup', {
       clientX: line.endX,
       clientY: line.endY,
+      isPrimary: true,
     })
 
   cy.findByRole('img', { name: 'rectangle' }).click()
@@ -60,20 +64,24 @@ export function createAllElements() {
     .trigger('pointerdown', {
       clientX: rectangle.startX,
       clientY: rectangle.startY,
+      isPrimary: true,
     })
     // in the middle
     .trigger('pointermove', {
       clientX: rectangle.middleX,
       clientY: rectangle.middleY,
+      isPrimary: true,
     })
     // end
     .trigger('pointermove', {
       clientX: rectangle.endX,
       clientY: rectangle.endY,
+      isPrimary: true,
     })
     .trigger('pointerup', {
       clientX: rectangle.endX,
       clientY: rectangle.endY,
+      isPrimary: true,
     })
 
   cy.findByRole('img', { name: 'text' }).click()
@@ -87,20 +95,24 @@ export function createAllElements() {
     .trigger('pointerdown', {
       clientX: arrow.startX,
       clientY: arrow.startY,
+      isPrimary: true,
     })
     // in the middle
     .trigger('pointermove', {
       clientX: arrow.middleX,
       clientY: arrow.middleY,
+      isPrimary: true,
     })
     // end
     .trigger('pointermove', {
       clientX: arrow.endX,
       clientY: arrow.endY,
+      isPrimary: true,
     })
     .trigger('pointerup', {
       clientX: arrow.endX,
       clientY: arrow.endY,
+      isPrimary: true,
     })
 
   cy.findByRole('img', { name: 'selection' }).click()

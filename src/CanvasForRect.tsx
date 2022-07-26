@@ -152,6 +152,9 @@ export function CanvasForRect({
     }
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
+      // reset the throttle timer that comes from the previous state's onPointerMove()
+      singletonThrottle.cancel()
+
       // adjust coord when finish drawing
       const drawnElement = getElementInCurrentSnapshot(uiState.data.elementId)
       if (!drawnElement || drawnElement.type !== 'rectangle') {

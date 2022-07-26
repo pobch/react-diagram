@@ -208,6 +208,9 @@ export function CanvasForLinear({
     }
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
+      // reset the throttle timer that comes from the previous state's onPointerMove()
+      singletonThrottle.cancel()
+
       setUiState({ state: 'none' })
       return
     }
