@@ -3,6 +3,7 @@ import { useState } from 'react'
 import rough from 'roughjs/bundled/rough.esm'
 import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
+import { singletonThrottle } from './helpers/throttle'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
@@ -123,6 +124,8 @@ export function CanvasForLinear({
   >({ state: 'none' })
 
   function handlePointerDown(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerUp() or initial state when mount
     if (uiState.state === 'none') {
       const { sceneX, sceneY } = viewportCoordsToSceneCoords({
@@ -138,26 +141,32 @@ export function CanvasForLinear({
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
-      const { sceneX, sceneY } = viewportCoordsToSceneCoords({
-        viewportX: e.clientX,
-        viewportY: e.clientY,
-      })
-      const newElementWithoutId = createLinearElementWithoutId({
-        lineType,
-        x1: uiState.data.pointerDownAtX,
-        y1: uiState.data.pointerDownAtY,
-        x2: sceneX,
-        y2: sceneY,
-      })
+      // wrap in throttle because the following code need to be called at most once
+      // https://github.com/pobch/react-diagram/issues/27
+      singletonThrottle(() => {
+        const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+          viewportX: e.clientX,
+          viewportY: e.clientY,
+        })
+        const newElementWithoutId = createLinearElementWithoutId({
+          lineType,
+          x1: uiState.data.pointerDownAtX,
+          y1: uiState.data.pointerDownAtY,
+          x2: sceneX,
+          y2: sceneY,
+        })
 
-      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
-      if (newId === undefined) {
-        throw new Error(`ID of the drawing ${lineType} element is missing`)
-      }
-      setUiState({ state: 'drawing', data: { elementId: newId } })
-      return
+        const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+        if (newId === undefined) {
+          throw new Error(`ID of the drawing ${lineType} element is missing`)
+        }
+        setUiState({ state: 'drawing', data: { elementId: newId } })
+        return
+      })
     }
     // should come from previous onPointerMove()
     if (uiState.state === 'drawing') {
@@ -189,6 +198,8 @@ export function CanvasForLinear({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    if (!e.isPrimary) return
+
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
       // no drawing occurs, do nothing with history
@@ -197,6 +208,9 @@ export function CanvasForLinear({
     }
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
+      // reset the throttle timer that comes from the previous state's onPointerMove()
+      singletonThrottle.cancel()
+
       setUiState({ state: 'none' })
       return
     }

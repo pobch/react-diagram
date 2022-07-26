@@ -6,18 +6,22 @@ it('should be able to create a rectangle', () => {
     .trigger('pointerdown', {
       clientX: 100,
       clientY: 100,
+      isPrimary: true,
     })
     .trigger('pointermove', {
       clientX: 200,
       clientY: 300,
+      isPrimary: true,
     })
     .trigger('pointerup', {
       clientX: 200,
       clientY: 300,
+      isPrimary: true,
     })
     .trigger('pointermove', {
       clientX: 250,
       clientY: 350,
+      isPrimary: true,
     })
 
   cy.compareSnapshot('happy-path-rectangle')
