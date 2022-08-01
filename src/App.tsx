@@ -114,9 +114,9 @@ function useHistory() {
     }
     setHistory((prevHistory) => {
       const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
-      setCurrentIndex(newHistory.length - 1)
       return newHistory
     })
+    setCurrentIndex((prevIndex) => prevIndex + 1)
 
     // for "addElement" mode, we also return new element's id
     if (options.mode === 'addElement') {
