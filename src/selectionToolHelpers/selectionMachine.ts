@@ -9,7 +9,7 @@ type TContext = {
   content: string
 }
 
-type TMoveData =
+export type TMoveData =
   | {
       elementType: 'line' | 'rectangle' | 'arrow' | 'image'
       elementId: number
@@ -28,12 +28,20 @@ type TMoveData =
       pointerOffsetY1: number
       content: string
     }
-type TDOWN_ON_ELEMENT = { type: 'DOWN_ON_ELEMENT' } & TMoveData
+type TDOWN_ON_ELEMENT = {
+  type: 'DOWN_ON_ELEMENT'
+} & TMoveData
 
 export const selectionMachine = createMachine({
   schema: {
     context: {} as TContext,
-    events: {} as TDOWN_ON_ELEMENT,
+    events: {} as
+      | TDOWN_ON_ELEMENT
+      | { type: 'FIRST_MOVE' }
+      | { type: 'UP_WITHOUT_MOVE' }
+      | { type: 'NEXT_MOVE'; sceneX: number; sceneY: number }
+      | { type: 'UP_AFTER_MOVE' }
+      | { type: 'RESET' },
   },
   id: 'selection',
   context: {
@@ -51,7 +59,6 @@ export const selectionMachine = createMachine({
         DOWN_ON_ELEMENT: {
           target: 'move',
           actions: [
-            'prepareMove',
             assign<TContext, TDOWN_ON_ELEMENT>((context, event) => {
               return {
                 ...context,
@@ -70,22 +77,31 @@ export const selectionMachine = createMachine({
           on: {
             FIRST_MOVE: { target: 'moving', actions: 'startMove' },
             UP_WITHOUT_MOVE: {
-              target: 'selection.singleElementSelected',
-              actions: 'selectElement',
+              target: '#selection.singleElementSelected',
             },
           },
         },
         moving: {
           on: {
             NEXT_MOVE: { target: 'moving', actions: 'continueMove' },
-            UP_AFTER_MOVE: { target: 'selection.singleElementSelected', actions: 'selectElement' },
+            UP_AFTER_MOVE: { target: '#selection.singleElementSelected' },
           },
         },
       },
     },
     singleElementSelected: {
       on: {
-        DOWN_ON_ELEMENT: { target: 'move', actions: 'prepareMove' },
+        DOWN_ON_ELEMENT: {
+          target: 'move',
+          actions: [
+            assign<TContext, TDOWN_ON_ELEMENT>((context, event) => {
+              return {
+                ...context,
+                ...event,
+              }
+            }),
+          ],
+        },
         RESET: 'none',
       },
     },

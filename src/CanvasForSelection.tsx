@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect, useEffect, useReducer } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
 import {
   getSvgPathFromStroke,
@@ -9,314 +9,12 @@ import {
 } from './App'
 import rough from 'roughjs/bundled/rough.esm'
 import getStroke from 'perfect-freehand'
-import { CmdButton } from './CmdButton'
-import { createPointerHandlers } from './selectionToolHelpers/eventHandlers'
 import { CONFIG } from './config'
 import { useMachine } from '@xstate/react'
-import { selectionMachine } from './selectionToolHelpers/selectionMachine'
-import { getTextElementAtPosition } from './CanvasForText'
-
-export function createMoveDataArray({
-  targetElements,
-  pointerX,
-  pointerY,
-}: {
-  targetElements: TElementData[]
-  pointerX: number
-  pointerY: number
-}): TMoveData[] {
-  return targetElements.map((targetElement) => {
-    switch (targetElement.type) {
-      case 'line':
-      case 'arrow':
-        return {
-          elementType: targetElement.type,
-          elementId: targetElement.id,
-          pointerOffsetX1: pointerX - targetElement.x1,
-          pointerOffsetY1: pointerY - targetElement.y1,
-        }
-      case 'rectangle':
-      case 'image':
-        return {
-          elementType: targetElement.type,
-          elementId: targetElement.id,
-          pointerOffsetX1: pointerX - targetElement.x1,
-          pointerOffsetY1: pointerY - targetElement.y1,
-        }
-      case 'pencil':
-        return {
-          elementType: 'pencil',
-          elementId: targetElement.id,
-          pointerOffsetFromPoints: targetElement.points.map((point) => ({
-            offsetX: pointerX - point.x,
-            offsetY: pointerY - point.y,
-          })),
-        }
-      case 'text':
-        return {
-          elementType: 'text',
-          elementId: targetElement.id,
-          pointerOffsetX1: pointerX - (targetElement.lines[0]?.lineX1 ?? pointerX),
-          pointerOffsetY1: pointerY - (targetElement.lines[0]?.lineY1 ?? pointerY),
-          content: targetElement.lines.map(({ lineContent }) => lineContent).join('\n'),
-        }
-      default:
-        throw new Error('Unsupported moving element type')
-    }
-  })
-}
-
-export function createResizeData({
-  targetElement,
-  pointerPosition,
-}: {
-  targetElement: TElementData
-  pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'bl' | 'br'
-}): TResizeData {
-  switch (targetElement.type) {
-    case 'line':
-    case 'arrow':
-      if (pointerPosition !== 'start' && pointerPosition !== 'end') {
-        throw new Error('Impossible pointer position for resizing a linear element')
-      }
-      return {
-        elementType: targetElement.type,
-        elementId: targetElement.id,
-        pointerPosition: pointerPosition,
-      }
-    case 'rectangle':
-    case 'image':
-      if (
-        pointerPosition !== 'tl' &&
-        pointerPosition !== 'tr' &&
-        pointerPosition !== 'bl' &&
-        pointerPosition !== 'br'
-      ) {
-        throw new Error('Impossible pointer position for resizing a rectangle or image element')
-      }
-      return {
-        elementType: targetElement.type,
-        elementId: targetElement.id,
-        pointerPosition: pointerPosition,
-      }
-    default:
-      throw new Error('Unsupported resizing element type')
-  }
-}
-
-type TResizeData =
-  | {
-      elementType: 'line' | 'arrow'
-      elementId: number
-      pointerPosition: 'start' | 'end'
-    }
-  | {
-      elementType: 'rectangle' | 'image'
-      elementId: number
-      pointerPosition: 'tl' | 'tr' | 'bl' | 'br'
-    }
-
-type TAreaSelectData = {
-  selectedElementIds: number[]
-  rectangleSelector: {
-    type: 'rectangleSelector'
-    x1: number
-    y1: number
-    x2: number
-    y2: number
-  }
-}
-
-export type TUiState =
-  | {
-      state: 'none'
-    }
-  | {
-      state: 'readyToMove'
-      data: TMoveData[]
-    }
-  | {
-      state: 'moving'
-      data: TMoveData[]
-    }
-  | {
-      state: 'readyToResize'
-      data: TResizeData
-    }
-  | {
-      state: 'resizing'
-      data: TResizeData
-    }
-  | {
-      state: 'areaSelecting'
-      data: TAreaSelectData
-    }
-  | {
-      state: 'singleElementSelected'
-      data: {
-        elementId: number
-      }
-    }
-  | {
-      state: 'multiElementSelected'
-      data: {
-        elementIds: number[]
-      }
-    }
-
-export type TAction =
-  | { type: 'dragSelect'; data: TAreaSelectData }
-  | { type: 'prepareMove'; data: TMoveData[] }
-  | { type: 'startMove'; data: TMoveData[] }
-  | { type: 'continueMove'; data: TMoveData[] }
-  | { type: 'prepareResize'; data: TResizeData }
-  | { type: 'startResize'; data: TResizeData }
-  | { type: 'continueResize'; data: TResizeData }
-  | { type: 'selectSingleElement'; data: { elementId: number } }
-  | { type: 'selectMultipleElements'; data: { elementIds: number[] } }
-  | { type: 'reset' }
-
-type TAllActionNames = TAction['type']
-
-export const validAction = {
-  none: {
-    prepareMove: 'prepareMove',
-    dragSelect: 'dragSelect',
-  },
-  readyToMove: {
-    startMove: 'startMove',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
-  },
-  moving: {
-    continueMove: 'continueMove',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
-  },
-  readyToResize: {
-    startResize: 'startResize',
-    selectSingleElement: 'selectSingleElement',
-    reset: 'reset',
-  },
-  resizing: {
-    continueResize: 'continueResize',
-    selectSingleElement: 'selectSingleElement',
-    reset: 'reset',
-  },
-  areaSelecting: {
-    dragSelect: 'dragSelect',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
-  },
-  singleElementSelected: {
-    prepareMove: 'prepareMove',
-    prepareResize: 'prepareResize',
-    dragSelect: 'dragSelect',
-    reset: 'reset',
-  },
-  multiElementSelected: {
-    prepareMove: 'prepareMove',
-    dragSelect: 'dragSelect',
-    reset: 'reset',
-  },
-} as const
-
-const mapActionNameToNextStateName = {
-  dragSelect: 'areaSelecting',
-
-  prepareMove: 'readyToMove',
-  startMove: 'moving',
-  continueMove: 'moving',
-
-  prepareResize: 'readyToResize',
-  startResize: 'resizing',
-  continueResize: 'resizing',
-
-  selectSingleElement: 'singleElementSelected',
-  selectMultipleElements: 'multiElementSelected',
-
-  reset: 'none',
-} as const
-
-function reducer(prevState: TUiState, action: TAction): TUiState {
-  const validActionWithLooserType: {
-    [CurrentStateName in TUiState['state']]: { [ActionName in TAllActionNames]?: ActionName }
-  } = validAction
-
-  const isActionValid = validActionWithLooserType[prevState.state][action.type]
-  if (!isActionValid) {
-    throw new Error(
-      `Changing state from "${prevState.state}" by action "${action.type}" is not allowed.`
-    )
-  }
-
-  switch (action.type) {
-    case 'dragSelect': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'prepareMove': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'startMove':
-    case 'continueMove': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'prepareResize': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'startResize':
-    case 'continueResize': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'selectSingleElement': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'selectMultipleElements': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'reset': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName }
-    }
-    default: {
-      throw new Error('Unsupported action type inside the reducer')
-    }
-  }
-}
-
-// * -------------------------- Helpers --------------------------
-
-function getSelectedElementIdsFromState(context: { elementId: number }) {
-  let elementIds: number[] = [context.elementId]
-
-  return elementIds
-}
-
-export function getElementsInSnapshot(
-  elementsSnapshot: TSnapshot,
-  elementIds: number[]
-): TElementData[] {
-  const elementIdsMap = elementIds.reduce((prev, elementId) => {
-    prev[elementId] = true
-    return prev
-  }, {} as { [elementId: number]: boolean })
-  const foundElementsInSnapshot = elementsSnapshot.filter((element) => {
-    return elementIdsMap[element.id]
-  })
-  return foundElementsInSnapshot
-}
-
-// * -------------------------- End ------------------------------
+import { selectionMachine, TMoveData } from './selectionToolHelpers/selectionMachine'
+import { createTextElementWithoutId, getTextElementAtPosition } from './CanvasForText'
+import { createLinearElementWithoutId } from './CanvasForLinear'
+import { moveImageElement, moveRectangleElement } from './selectionToolHelpers/moveHelpers'
 
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 
@@ -349,16 +47,95 @@ export function CanvasForSelection({
     sceneY: number
   }
   drawScene: (extra?: {
-    elements: (TElementData | TAreaSelectData['rectangleSelector'])[]
-    drawFn: (
-      element: TElementData | TAreaSelectData['rectangleSelector'],
-      canvas: HTMLCanvasElement
-    ) => void
+    elements: TElementData[]
+    drawFn: (element: TElementData, canvas: HTMLCanvasElement) => void
   }) => void
 }) {
   const [state, send] = useMachine(selectionMachine, {
     actions: {
-      prepareMove: (context, event) => {},
+      startMove: (context, event) => {
+        commitNewSnapshot({ mode: 'clone' })
+      },
+      continueMove: (context, event) => {
+        if (event.type === 'NEXT_MOVE') {
+          let replacedMultiElements: TElementData[] = []
+
+          const movingElementId = context.elementId
+
+          const movingElementInSnapshot = getElementInCurrentSnapshot(movingElementId)
+          if (!movingElementInSnapshot) {
+            throw new Error('You are trying to move an non-exist element in the current snapshot!!')
+          }
+          if (
+            (context.elementType === 'line' && movingElementInSnapshot.type === 'line') ||
+            (context.elementType === 'arrow' && movingElementInSnapshot.type === 'arrow')
+          ) {
+            const newX1 = event.sceneX - context.pointerOffsetX1
+            const newY1 = event.sceneY - context.pointerOffsetY1
+            // keep existing line width
+            const distanceX = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
+            const distanceY = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
+            const newElementWithoutId = createLinearElementWithoutId({
+              lineType: movingElementInSnapshot.type,
+              x1: newX1,
+              y1: newY1,
+              x2: newX1 + distanceX,
+              y2: newY1 + distanceY,
+            })
+            replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
+          } else if (
+            context.elementType === 'rectangle' &&
+            movingElementInSnapshot.type === 'rectangle'
+          ) {
+            const newX1 = event.sceneX - context.pointerOffsetX1
+            const newY1 = event.sceneY - context.pointerOffsetY1
+            const newElementWithoutId = moveRectangleElement({
+              newX1: newX1,
+              newY1: newY1,
+              rectElementToMove: movingElementInSnapshot,
+            })
+            replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
+          } else if (context.elementType === 'image' && movingElementInSnapshot.type === 'image') {
+            const newX1 = event.sceneX - context.pointerOffsetX1
+            const newY1 = event.sceneY - context.pointerOffsetY1
+            const newElementWithoutId = moveImageElement({
+              newX1: newX1,
+              newY1: newY1,
+              imageElementToMove: movingElementInSnapshot,
+            })
+            replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
+          } else if (
+            context.elementType === 'pencil' &&
+            movingElementInSnapshot.type === 'pencil'
+          ) {
+            const newPoints = context.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
+              x: event.sceneX - offsetX,
+              y: event.sceneY - offsetY,
+            }))
+            const newElement: TElementData = {
+              id: movingElementId,
+              type: 'pencil',
+              points: newPoints,
+            }
+            replacedMultiElements.push(newElement)
+          } else if (context.elementType === 'text' && movingElementInSnapshot.type === 'text') {
+            const newElementWithoutId = createTextElementWithoutId({
+              canvasForMeasure: canvasForMeasureRef.current,
+              content: context.content,
+              isWriting: false,
+              x1: event.sceneX - context.pointerOffsetX1,
+              y1: event.sceneY - context.pointerOffsetY1,
+            })
+            replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
+          } else {
+            throw new Error(
+              '1. Mismatch between moving element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for moving'
+            )
+          }
+
+          replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
+        }
+      },
     },
   })
 
@@ -522,10 +299,12 @@ export function CanvasForSelection({
     }
   }, [state, currentSnapshot, send])
 
-  const [cursorType, setCursorType] = useState<TCursorType>('default')
+  const [cursorType] = useState<TCursorType>('default')
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
 
-  let handlePointerDown, handlePointerMove, handlePointerUp
+  let handlePointerDown = (e: React.PointerEvent) => {}
+  let handlePointerMove = (e: React.PointerEvent) => {}
+  let handlePointerUp = (e: React.PointerEvent) => {}
 
   switch (true) {
     case state.value === 'none': {
@@ -550,14 +329,86 @@ export function CanvasForSelection({
         }
 
         // pointer down hits on an element
-        dispatch({
-          type: validAction[uiState.state].prepareMove,
-          data: createMoveDataArray({
-            targetElements: [hitPoint.foundLastElement],
+        send(
+          'DOWN_ON_ELEMENT',
+          createMoveData({
+            targetElement: hitPoint.foundLastElement,
             pointerX: sceneX,
             pointerY: sceneY,
-          }),
+          })
+        )
+        return
+      }
+      handlePointerMove = (e: React.PointerEvent) => {}
+      handlePointerUp = (e: React.PointerEvent) => {}
+      break
+    }
+    case state.matches({ move: 'readyToMove' }): {
+      handlePointerDown = (e: React.PointerEvent) => {}
+      handlePointerMove = (e: React.PointerEvent) => {
+        if (!e.isPrimary) return
+
+        send('FIRST_MOVE')
+        return
+      }
+      handlePointerUp = (e: React.PointerEvent) => {
+        if (!e.isPrimary) return
+
+        send('UP_WITHOUT_MOVE')
+        return
+      }
+      break
+    }
+    case state.matches({ move: 'moving' }): {
+      handlePointerDown = (e: React.PointerEvent) => {}
+      handlePointerMove = (e: React.PointerEvent) => {
+        if (!e.isPrimary) return
+
+        const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+          viewportX: e.clientX,
+          viewportY: e.clientY,
         })
+
+        send('NEXT_MOVE', { sceneX, sceneY })
+        return
+      }
+      handlePointerUp = (e: React.PointerEvent) => {
+        if (!e.isPrimary) return
+
+        send('UP_AFTER_MOVE')
+        return
+      }
+      break
+    }
+    case state.value === 'singleElementSelected': {
+      handlePointerDown = (e: React.PointerEvent) => {
+        if (!e.isPrimary) return
+
+        const { sceneX, sceneY } = viewportCoordsToSceneCoords({
+          viewportX: e.clientX,
+          viewportY: e.clientY,
+        })
+        const hitPoint = getLastElementAtPosition({
+          elementsSource: currentSnapshot,
+          xPosition: sceneX,
+          yPosition: sceneY,
+        })
+        const isHit = hitPoint.pointerPosition !== 'notFound'
+
+        // pointer down does not hit on any elements
+        if (!isHit) {
+          send('RESET')
+          return
+        }
+
+        send(
+          'DOWN_ON_ELEMENT',
+          createMoveData({
+            targetElement: hitPoint.foundLastElement,
+            pointerX: sceneX,
+            pointerY: sceneY,
+          })
+        )
         return
       }
       handlePointerMove = (e: React.PointerEvent) => {}
@@ -833,4 +684,69 @@ function getLastElementAtPosition({
     return { pointerPosition, foundLastElement }
   // Should not reach here
   throw new Error('Impossible state: Found an element but the pointer position is "notFound"')
+}
+
+function createMoveData({
+  targetElement,
+  pointerX,
+  pointerY,
+}: {
+  targetElement: TElementData
+  pointerX: number
+  pointerY: number
+}): TMoveData {
+  switch (targetElement.type) {
+    case 'line':
+    case 'arrow':
+      return {
+        elementType: targetElement.type,
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - targetElement.x1,
+        pointerOffsetY1: pointerY - targetElement.y1,
+      }
+    case 'rectangle':
+    case 'image':
+      return {
+        elementType: targetElement.type,
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - targetElement.x1,
+        pointerOffsetY1: pointerY - targetElement.y1,
+      }
+    case 'pencil':
+      return {
+        elementType: 'pencil',
+        elementId: targetElement.id,
+        pointerOffsetFromPoints: targetElement.points.map((point) => ({
+          offsetX: pointerX - point.x,
+          offsetY: pointerY - point.y,
+        })),
+      }
+    case 'text':
+      return {
+        elementType: 'text',
+        elementId: targetElement.id,
+        pointerOffsetX1: pointerX - (targetElement.lines[0]?.lineX1 ?? pointerX),
+        pointerOffsetY1: pointerY - (targetElement.lines[0]?.lineY1 ?? pointerY),
+        content: targetElement.lines.map(({ lineContent }) => lineContent).join('\n'),
+      }
+    default:
+      throw new Error('Unsupported moving element type')
+  }
+}
+
+function getSelectedElementIdsFromState(context: { elementId: number }) {
+  let elementIds: number[] = [context.elementId]
+
+  return elementIds
+}
+
+function getElementsInSnapshot(elementsSnapshot: TSnapshot, elementIds: number[]): TElementData[] {
+  const elementIdsMap = elementIds.reduce((prev, elementId) => {
+    prev[elementId] = true
+    return prev
+  }, {} as { [elementId: number]: boolean })
+  const foundElementsInSnapshot = elementsSnapshot.filter((element) => {
+    return elementIdsMap[element.id]
+  })
+  return foundElementsInSnapshot
 }
