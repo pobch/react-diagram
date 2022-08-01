@@ -181,6 +181,7 @@ export type TUiState =
     }
 
 export type TAction =
+  | { type: 'prepareDragSelect'; data: TAreaSelectData }
   | { type: 'dragSelect'; data: TAreaSelectData }
   | { type: 'prepareMove'; data: TMoveData[] }
   | { type: 'startMove'; data: TMoveData[] }
@@ -197,7 +198,7 @@ type TAllActionNames = TAction['type']
 export const validAction = {
   none: {
     prepareMove: 'prepareMove',
-    dragSelect: 'dragSelect',
+    prepareDragSelect: 'prepareDragSelect',
   },
   readyToMove: {
     startMove: 'startMove',
@@ -230,17 +231,18 @@ export const validAction = {
   singleElementSelected: {
     prepareMove: 'prepareMove',
     prepareResize: 'prepareResize',
-    dragSelect: 'dragSelect',
+    prepareDragSelect: 'prepareDragSelect',
     reset: 'reset',
   },
   multiElementSelected: {
     prepareMove: 'prepareMove',
-    dragSelect: 'dragSelect',
+    prepareDragSelect: 'prepareDragSelect',
     reset: 'reset',
   },
 } as const
 
 const mapActionNameToNextStateName = {
+  prepareDragSelect: 'areaSelecting',
   dragSelect: 'areaSelecting',
 
   prepareMove: 'readyToMove',
@@ -270,6 +272,7 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
   }
 
   switch (action.type) {
+    case 'prepareDragSelect':
     case 'dragSelect': {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName, data: action.data }

@@ -382,6 +382,83 @@ export function createPointerHandlers({
   setCursorType: React.Dispatch<React.SetStateAction<TCursorType>>
   canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
+  const actions = {
+    prepareDragSelect: (sceneX: number, sceneY: number) => {
+      dispatch({
+        type: 'prepareDragSelect',
+        data: {
+          rectangleSelector: {
+            type: 'rectangleSelector',
+            x1: sceneX,
+            y1: sceneY,
+            x2: sceneX,
+            y2: sceneY,
+          },
+          selectedElementIds: [],
+        },
+      })
+    },
+    dragSelect: (
+      sceneX: number,
+      sceneY: number,
+      prevState: Extract<TUiState, { state: 'areaSelecting' }>
+    ) => {
+      dispatch({
+        type: 'dragSelect',
+        data: {
+          rectangleSelector: {
+            type: 'rectangleSelector',
+            x1: prevState.data.rectangleSelector.x1,
+            y1: prevState.data.rectangleSelector.y1,
+            x2: sceneX,
+            y2: sceneY,
+          },
+          selectedElementIds: getAllElementIdsInsideRectSelector({
+            elementsSnapshot: currentSnapshot,
+            rectSelectorX1: prevState.data.rectangleSelector.x1,
+            rectSelectorY1: prevState.data.rectangleSelector.y1,
+            rectSelectorX2: sceneX,
+            rectSelectorY2: sceneY,
+          }),
+        },
+      })
+    },
+    prepareMove: (sceneX: number, sceneY: number, elementsToMove: TElementData[]) => {
+      dispatch({
+        type: 'prepareMove',
+        data: createMoveDataArray({
+          targetElements: elementsToMove,
+          pointerX: sceneX,
+          pointerY: sceneY,
+        }),
+      })
+    },
+    selectMultipleElements: (
+      prevState: Extract<
+        TUiState,
+        { state: 'areaSelecting' } | { state: 'readyToMove' } | { state: 'moving' }
+      >
+    ) => {
+      switch (prevState.state) {
+        case 'areaSelecting':
+          dispatch({
+            type: 'selectMultipleElements',
+            data: {
+              elementIds: prevState.data.selectedElementIds,
+            },
+          })
+          return
+        case 'readyToMove':
+        case 'moving':
+          dispatch({
+            type: 'selectMultipleElements',
+            data: { elementIds: prevState.data.map((moveData) => moveData.elementId) },
+          })
+          return
+      }
+    },
+  } as const
+
   function handleCursorUI(e: React.PointerEvent) {
     const { sceneX, sceneY } = viewportCoordsToSceneCoords({
       viewportX: e.clientX,
@@ -433,31 +510,14 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            dispatch({
-              type: validAction[uiState.state].dragSelect,
-              data: {
-                rectangleSelector: {
-                  type: 'rectangleSelector',
-                  x1: sceneX,
-                  y1: sceneY,
-                  x2: sceneX,
-                  y2: sceneY,
-                },
-                selectedElementIds: [],
-              },
-            })
+            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
             return
           }
 
           // pointer down hits on an element
-          dispatch({
-            type: validAction[uiState.state].prepareMove,
-            data: createMoveDataArray({
-              targetElements: [hitPoint.foundLastElement],
-              pointerX: sceneX,
-              pointerY: sceneY,
-            }),
-          })
+          actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
+            hitPoint.foundLastElement,
+          ])
           return
         },
         handlePointerMove(e: React.PointerEvent) {
@@ -486,25 +546,7 @@ export function createPointerHandlers({
           })
 
           // continue dragging
-          dispatch({
-            type: validAction[uiState.state].dragSelect,
-            data: {
-              rectangleSelector: {
-                type: 'rectangleSelector',
-                x1: uiState.data.rectangleSelector.x1,
-                y1: uiState.data.rectangleSelector.y1,
-                x2: sceneX,
-                y2: sceneY,
-              },
-              selectedElementIds: getAllElementIdsInsideRectSelector({
-                elementsSnapshot: currentSnapshot,
-                rectSelectorX1: uiState.data.rectangleSelector.x1,
-                rectSelectorY1: uiState.data.rectangleSelector.y1,
-                rectSelectorX2: sceneX,
-                rectSelectorY2: sceneY,
-              }),
-            },
-          })
+          actions[validAction[uiState.state].dragSelect](sceneX, sceneY, uiState)
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -513,12 +555,7 @@ export function createPointerHandlers({
           // should come from onPointerMove() of the previous same state: 'areaSelecting'
 
           if (uiState.data.selectedElementIds.length >= 2) {
-            dispatch({
-              type: validAction[uiState.state].selectMultipleElements,
-              data: {
-                elementIds: uiState.data.selectedElementIds,
-              },
-            })
+            actions[validAction[uiState.state].selectMultipleElements](uiState)
             return
           }
           if (uiState.data.selectedElementIds.length === 1) {
@@ -576,10 +613,7 @@ export function createPointerHandlers({
             return
           }
           if (uiState.data.length >= 2) {
-            dispatch({
-              type: validAction[uiState.state].selectMultipleElements,
-              data: { elementIds: uiState.data.map((moveData) => moveData.elementId) },
-            })
+            actions[validAction[uiState.state].selectMultipleElements](uiState)
             return
           }
         },
@@ -719,10 +753,7 @@ export function createPointerHandlers({
             return
           }
           if (uiState.data.length >= 2) {
-            dispatch({
-              type: validAction[uiState.state].selectMultipleElements,
-              data: { elementIds: uiState.data.map((moveData) => moveData.elementId) },
-            })
+            actions[validAction[uiState.state].selectMultipleElements](uiState)
             return
           }
         },
@@ -922,33 +953,16 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            dispatch({
-              type: validAction[uiState.state].dragSelect,
-              data: {
-                rectangleSelector: {
-                  type: 'rectangleSelector',
-                  x1: sceneX,
-                  y1: sceneY,
-                  x2: sceneX,
-                  y2: sceneY,
-                },
-                selectedElementIds: [],
-              },
-            })
+            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
             return
           }
           // pointer down hits a different element than the current selected element
           const isHitOnUnselectedElement = hitPoint.foundLastElement.id !== uiState.data.elementId
           if (isHitOnUnselectedElement) {
             // allow to move only
-            dispatch({
-              type: validAction[uiState.state].prepareMove,
-              data: createMoveDataArray({
-                targetElements: [hitPoint.foundLastElement],
-                pointerX: sceneX,
-                pointerY: sceneY,
-              }),
-            })
+            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
+              hitPoint.foundLastElement,
+            ])
             return
           }
 
@@ -956,14 +970,9 @@ export function createPointerHandlers({
           // we allow to either move or resize an element
           // ... so, we need to check which part of the element was clicked
           if (hitPoint.pointerPosition === 'onLine' || hitPoint.pointerPosition === 'inside') {
-            dispatch({
-              type: validAction[uiState.state].prepareMove,
-              data: createMoveDataArray({
-                targetElements: [hitPoint.foundLastElement],
-                pointerX: sceneX,
-                pointerY: sceneY,
-              }),
-            })
+            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
+              hitPoint.foundLastElement,
+            ])
           } else if (
             hitPoint.pointerPosition === 'start' ||
             hitPoint.pointerPosition === 'end' ||
@@ -1010,19 +1019,7 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            dispatch({
-              type: validAction[uiState.state].dragSelect,
-              data: {
-                rectangleSelector: {
-                  type: 'rectangleSelector',
-                  x1: sceneX,
-                  y1: sceneY,
-                  x2: sceneX,
-                  y2: sceneY,
-                },
-                selectedElementIds: [],
-              },
-            })
+            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
             return
           }
 
@@ -1038,14 +1035,7 @@ export function createPointerHandlers({
           // pointer down hits on the current selected elements
           // we allow to move only
           if (isPointerHitOneOfSelectedElements) {
-            dispatch({
-              type: validAction[uiState.state].prepareMove,
-              data: createMoveDataArray({
-                targetElements: currentSelectedElements,
-                pointerX: sceneX,
-                pointerY: sceneY,
-              }),
-            })
+            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, currentSelectedElements)
             return
           }
           // pointer down hits on a different element than the current selected elements
