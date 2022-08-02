@@ -55,13 +55,11 @@ export function CanvasForSelection({
   const [state, send] = useMachine(selectionMachine, {
     actions: {
       startMove: (context, event) => {
-        console.log('triggered commitNewSnapshot')
         flushSync(() => {
           commitNewSnapshot({ mode: 'clone' })
         })
       },
       continueMove: (context, event) => {
-        console.log('triggered continueMove')
         if (event.type === 'NEXT_MOVE') {
           let replacedMultiElements: TElementData[] = []
 
@@ -137,7 +135,7 @@ export function CanvasForSelection({
               '1. Mismatch between moving element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for moving'
             )
           }
-          console.log('triggerd replaceCurrentSnapshotByReplacingElements')
+
           replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
         }
       },

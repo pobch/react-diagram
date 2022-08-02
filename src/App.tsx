@@ -72,7 +72,6 @@ function useHistory() {
   const [history, setHistory] = useState<TSnapshot[]>([[]])
   const [currentIndex, setCurrentIndex] = useState(0)
   const currentSnapshot = history[currentIndex]
-  console.log('currentIndex', currentIndex)
   if (!currentSnapshot) {
     throw new Error('The whole current snapshot is not exist in this point of history!!')
   }
