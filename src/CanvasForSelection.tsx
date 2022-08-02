@@ -15,6 +15,7 @@ import { selectionMachine, TMoveData } from './selectionToolHelpers/selectionMac
 import { createTextElementWithoutId, getTextElementAtPosition } from './CanvasForText'
 import { createLinearElementWithoutId } from './CanvasForLinear'
 import { moveImageElement, moveRectangleElement } from './selectionToolHelpers/moveHelpers'
+import { flushSync } from 'react-dom'
 
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 
@@ -55,7 +56,9 @@ export function CanvasForSelection({
     actions: {
       startMove: (context, event) => {
         console.log('triggered commitNewSnapshot')
-        commitNewSnapshot({ mode: 'clone' })
+        flushSync(() => {
+          commitNewSnapshot({ mode: 'clone' })
+        })
       },
       continueMove: (context, event) => {
         console.log('triggered continueMove')
