@@ -72,6 +72,7 @@ function useHistory() {
   const [history, setHistory] = useState<TSnapshot[]>([[]])
   const [currentIndex, setCurrentIndex] = useState(0)
   const currentSnapshot = history[currentIndex]
+  console.log('currentIndex', currentIndex)
   if (!currentSnapshot) {
     throw new Error('The whole current snapshot is not exist in this point of history!!')
   }
@@ -116,7 +117,7 @@ function useHistory() {
       const newHistory = [...prevHistory.slice(0, currentIndex + 1), newSnapshot]
       return newHistory
     })
-    setCurrentIndex((prevIndex) => prevIndex + 1)
+    setCurrentIndex(currentIndex + 1)
 
     // for "addElement" mode, we also return new element's id
     if (options.mode === 'addElement') {
