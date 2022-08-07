@@ -1,26 +1,10 @@
 /* eslint-disable no-extra-label */
 import * as React from 'react'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from '../App'
-import { createLinearElementWithoutId } from '../CanvasForLinear'
-import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../CanvasForRect'
-import {
-  createMoveDataArray,
-  createResizeData,
-  getElementsInSnapshot,
-  TAction,
-  TCursorType,
-  TUiState,
-  validAction,
-} from '../CanvasForSelection'
-import { createTextElementWithoutId, getTextElementAtPosition } from '../CanvasForText'
+import { TElementData, TSnapshot } from '../App'
+import { getElementsInSnapshot, TCursorType } from '../CanvasForSelection'
+import { getTextElementAtPosition } from '../CanvasForText'
 import { singletonThrottle } from '../helpers/throttle'
-import { moveImageElement, moveRectangleElement } from './moveHelpers'
-import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
+import { TUiState, useSelectionMachine, validAction } from './useSelectionMachine'
 
 function getLastElementAtPosition({
   elementsSource,
@@ -268,197 +252,22 @@ function getLastElementAtPosition({
   throw new Error('Impossible state: Found an element but the pointer position is "notFound"')
 }
 
-function getAllElementIdsInsideRectSelector({
-  elementsSnapshot,
-  rectSelectorX1,
-  rectSelectorX2,
-  rectSelectorY1,
-  rectSelectorY2,
-}: {
-  elementsSnapshot: TElementData[]
-  rectSelectorX1: number
-  rectSelectorY1: number
-  rectSelectorX2: number
-  rectSelectorY2: number
-}) {
-  const selectedElements = elementsSnapshot.filter((element) => {
-    const rectMinX = Math.min(rectSelectorX1, rectSelectorX2)
-    const rectMaxX = Math.max(rectSelectorX1, rectSelectorX2)
-    const rectMinY = Math.min(rectSelectorY1, rectSelectorY2)
-    const rectMaxY = Math.max(rectSelectorY1, rectSelectorY2)
-    if (element.type === 'arrow' || element.type === 'line') {
-      if (
-        rectMinX <= element.x1 &&
-        element.x1 <= rectMaxX &&
-        rectMinY <= element.y1 &&
-        element.y1 <= rectMaxY &&
-        rectMinX <= element.x2 &&
-        element.x2 <= rectMaxX &&
-        rectMinY <= element.y2 &&
-        element.y2 <= rectMaxY
-      ) {
-        return true
-      }
-    } else if (element.type === 'rectangle' || element.type === 'image') {
-      const elmMinX = Math.min(element.x1, element.x2)
-      const elmMaxX = Math.max(element.x1, element.x2)
-      const elmMinY = Math.min(element.y1, element.y2)
-      const elmMaxY = Math.max(element.y1, element.y2)
-      if (
-        rectMinX <= elmMinX &&
-        elmMinX <= rectMaxX &&
-        rectMinX <= elmMaxX &&
-        elmMaxX <= rectMaxX &&
-        rectMinY <= elmMinY &&
-        elmMinY <= rectMaxY &&
-        rectMinY <= elmMaxY &&
-        elmMaxY <= rectMaxY
-      ) {
-        return true
-      }
-    } else if (element.type === 'text') {
-      const elmMinX = element.lines[0]?.lineX1 ?? -Infinity
-      const elmMinY = element.lines[0]?.lineY1 ?? -Infinity
-      const elmMaxY =
-        (element.lines.at(-1)?.lineY1 ?? Infinity) + (element.lines.at(-1)?.lineHeight ?? Infinity)
-      let elmMaxX = -Infinity
-      element.lines.forEach((line) => {
-        elmMaxX = Math.max(line.lineX1 + line.lineWidth, elmMaxX)
-      })
-      if (elmMaxX === -Infinity) elmMaxX = Infinity
-
-      if (
-        rectMinX <= elmMinX &&
-        elmMinX <= rectMaxX &&
-        rectMinX <= elmMaxX &&
-        elmMaxX <= rectMaxX &&
-        rectMinY <= elmMinY &&
-        elmMinY <= rectMaxY &&
-        rectMinY <= elmMaxY &&
-        elmMaxY <= rectMaxY
-      ) {
-        return true
-      }
-    } else if (element.type === 'pencil') {
-      const isInside = element.points.every((point) => {
-        if (
-          rectMinX <= point.x &&
-          point.x <= rectMaxX &&
-          rectMinY <= point.y &&
-          point.y <= rectMaxY
-        ) {
-          return true
-        }
-        return false
-      })
-      return isInside
-    }
-    return false
-  })
-  return selectedElements.map((element) => element.id)
-}
-
 export function createPointerHandlers({
   uiState,
-  dispatch,
+  actions,
   currentSnapshot,
-  getElementInCurrentSnapshot,
-  commitNewSnapshot,
-  replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
   setCursorType,
-  canvasForMeasureRef,
 }: {
   uiState: TUiState
-  dispatch: React.Dispatch<TAction>
+  actions: ReturnType<typeof useSelectionMachine>['actions']
   currentSnapshot: TSnapshot
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
-  replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
     sceneY: number
   }
   setCursorType: React.Dispatch<React.SetStateAction<TCursorType>>
-  canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
-  const actions = {
-    prepareDragSelect: (sceneX: number, sceneY: number) => {
-      dispatch({
-        type: 'prepareDragSelect',
-        data: {
-          rectangleSelector: {
-            type: 'rectangleSelector',
-            x1: sceneX,
-            y1: sceneY,
-            x2: sceneX,
-            y2: sceneY,
-          },
-          selectedElementIds: [],
-        },
-      })
-    },
-    dragSelect: (
-      sceneX: number,
-      sceneY: number,
-      prevState: Extract<TUiState, { state: 'areaSelecting' }>
-    ) => {
-      dispatch({
-        type: 'dragSelect',
-        data: {
-          rectangleSelector: {
-            type: 'rectangleSelector',
-            x1: prevState.data.rectangleSelector.x1,
-            y1: prevState.data.rectangleSelector.y1,
-            x2: sceneX,
-            y2: sceneY,
-          },
-          selectedElementIds: getAllElementIdsInsideRectSelector({
-            elementsSnapshot: currentSnapshot,
-            rectSelectorX1: prevState.data.rectangleSelector.x1,
-            rectSelectorY1: prevState.data.rectangleSelector.y1,
-            rectSelectorX2: sceneX,
-            rectSelectorY2: sceneY,
-          }),
-        },
-      })
-    },
-    prepareMove: (sceneX: number, sceneY: number, elementsToMove: TElementData[]) => {
-      dispatch({
-        type: 'prepareMove',
-        data: createMoveDataArray({
-          targetElements: elementsToMove,
-          pointerX: sceneX,
-          pointerY: sceneY,
-        }),
-      })
-    },
-    selectMultipleElements: (
-      prevState: Extract<
-        TUiState,
-        { state: 'areaSelecting' } | { state: 'readyToMove' } | { state: 'moving' }
-      >
-    ) => {
-      switch (prevState.state) {
-        case 'areaSelecting':
-          dispatch({
-            type: 'selectMultipleElements',
-            data: {
-              elementIds: prevState.data.selectedElementIds,
-            },
-          })
-          return
-        case 'readyToMove':
-        case 'moving':
-          dispatch({
-            type: 'selectMultipleElements',
-            data: { elementIds: prevState.data.map((moveData) => moveData.elementId) },
-          })
-          return
-      }
-    },
-  } as const
-
   function handleCursorUI(e: React.PointerEvent) {
     const { sceneX, sceneY } = viewportCoordsToSceneCoords({
       viewportX: e.clientX,
@@ -510,14 +319,16 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
+            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
 
           // pointer down hits on an element
-          actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
-            hitPoint.foundLastElement,
-          ])
+          actions[validAction[uiState.state].prepareMove]({
+            sceneX,
+            sceneY,
+            elementsToMove: [hitPoint.foundLastElement],
+          })
           return
         },
         handlePointerMove(e: React.PointerEvent) {
@@ -546,7 +357,7 @@ export function createPointerHandlers({
           })
 
           // continue dragging
-          actions[validAction[uiState.state].dragSelect](sceneX, sceneY, uiState)
+          actions[validAction[uiState.state].dragSelect]({ sceneX, sceneY, prevState: uiState })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -555,23 +366,16 @@ export function createPointerHandlers({
           // should come from onPointerMove() of the previous same state: 'areaSelecting'
 
           if (uiState.data.selectedElementIds.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements](uiState)
+            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
             return
           }
           if (uiState.data.selectedElementIds.length === 1) {
-            dispatch({
-              type: validAction[uiState.state].selectSingleElement,
-              data: {
-                elementId: uiState.data.selectedElementIds[0]!,
-              },
-            })
+            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
             return
           }
           if (uiState.data.selectedElementIds.length === 0) {
             // no element got selected
-            dispatch({
-              type: validAction[uiState.state].reset,
-            })
+            actions[validAction[uiState.state].reset]()
             return
           }
         },
@@ -589,8 +393,7 @@ export function createPointerHandlers({
             handleCursorUI(e)
 
             // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
-            commitNewSnapshot({ mode: 'clone' })
-            dispatch({ type: validAction[uiState.state].startMove, data: [...uiState.data] })
+            actions[validAction[uiState.state].startMove]({ prevState: uiState })
             return
           })
         },
@@ -606,14 +409,11 @@ export function createPointerHandlers({
             throw new Error('Cannot select any element because the moving element id is missing')
           }
           if (uiState.data.length === 1) {
-            dispatch({
-              type: validAction[uiState.state].selectSingleElement,
-              data: { elementId: uiState.data[0]!.elementId },
-            })
+            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
             return
           }
           if (uiState.data.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements](uiState)
+            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
             return
           }
         },
@@ -636,102 +436,7 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
 
-          // store all moving elements, will be used to replace the current snapshot
-          let replacedMultiElements: TElementData[] = []
-
-          // create new element for replacing, one-by-one
-          uiState.data.forEach((moveData) => {
-            const movingElementId = moveData.elementId
-
-            const movingElementInSnapshot = getElementInCurrentSnapshot(movingElementId)
-            if (!movingElementInSnapshot) {
-              throw new Error(
-                'You are trying to move an non-exist element in the current snapshot!!'
-              )
-            }
-            if (
-              (moveData.elementType === 'line' && movingElementInSnapshot.type === 'line') ||
-              (moveData.elementType === 'arrow' && movingElementInSnapshot.type === 'arrow')
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              // keep existing line width
-              const distanceX = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
-              const distanceY = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: movingElementInSnapshot.type,
-                x1: newX1,
-                y1: newY1,
-                x2: newX1 + distanceX,
-                y2: newY1 + distanceY,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'rectangle' &&
-              movingElementInSnapshot.type === 'rectangle'
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              const newElementWithoutId = moveRectangleElement({
-                newX1: newX1,
-                newY1: newY1,
-                rectElementToMove: movingElementInSnapshot,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'image' &&
-              movingElementInSnapshot.type === 'image'
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              const newElementWithoutId = moveImageElement({
-                newX1: newX1,
-                newY1: newY1,
-                imageElementToMove: movingElementInSnapshot,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'pencil' &&
-              movingElementInSnapshot.type === 'pencil'
-            ) {
-              const newPoints = moveData.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
-                x: sceneX - offsetX,
-                y: sceneY - offsetY,
-              }))
-              const newElement: TElementData = {
-                id: movingElementId,
-                type: 'pencil',
-                points: newPoints,
-              }
-              replacedMultiElements.push(newElement)
-              // continue forEach loop
-              return
-            } else if (moveData.elementType === 'text' && movingElementInSnapshot.type === 'text') {
-              const newElementWithoutId = createTextElementWithoutId({
-                canvasForMeasure: canvasForMeasureRef.current,
-                content: moveData.content,
-                isWriting: false,
-                x1: sceneX - moveData.pointerOffsetX1,
-                y1: sceneY - moveData.pointerOffsetY1,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else {
-              throw new Error(
-                '1. Mismatch between moving element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for moving'
-              )
-            }
-          })
-
-          replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
-          dispatch({ type: validAction[uiState.state].continueMove, data: [...uiState.data] })
+          actions[validAction[uiState.state].continueMove]({ prevState: uiState, sceneX, sceneY })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -746,14 +451,11 @@ export function createPointerHandlers({
             )
           }
           if (uiState.data.length === 1) {
-            dispatch({
-              type: validAction[uiState.state].selectSingleElement,
-              data: { elementId: uiState.data[0]!.elementId },
-            })
+            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
             return
           }
           if (uiState.data.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements](uiState)
+            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
             return
           }
         },
@@ -771,8 +473,7 @@ export function createPointerHandlers({
             handleCursorUI(e)
 
             // should come from onPointerDown() of 'singleElementSelected' state
-            commitNewSnapshot({ mode: 'clone' })
-            dispatch({ type: validAction[uiState.state].startResize, data: { ...uiState.data } })
+            actions[validAction[uiState.state].startResize]({ prevState: uiState })
             return
           })
         },
@@ -784,10 +485,7 @@ export function createPointerHandlers({
           // This means the selected element is not actually resize.
           // Therefore, don't do anything with history.
 
-          dispatch({
-            type: validAction[uiState.state].selectSingleElement,
-            data: { elementId: uiState.data.elementId },
-          })
+          actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
           return
         },
       }
@@ -809,92 +507,8 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
 
-          // replace this specific element
-          const resizingElementId = uiState.data.elementId
-
-          const resizingElement = getElementInCurrentSnapshot(resizingElementId)
-          if (!resizingElement) {
-            throw new Error(
-              'You are trying to resize an non-exist element in the current snapshot!!'
-            )
-          }
-          if (
-            (uiState.data.elementType === 'line' && resizingElement.type === 'line') ||
-            (uiState.data.elementType === 'arrow' && resizingElement.type === 'arrow')
-          ) {
-            if (uiState.data.pointerPosition === 'start') {
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: resizingElement.type,
-                x1: sceneX,
-                y1: sceneY,
-                x2: resizingElement.x2,
-                y2: resizingElement.y2,
-              })
-              replaceCurrentSnapshotByReplacingElements({
-                replacedElement: { ...newElementWithoutId, id: resizingElementId },
-              })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            } else if (uiState.data.pointerPosition === 'end') {
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: resizingElement.type,
-                x1: resizingElement.x1,
-                y1: resizingElement.y1,
-                x2: sceneX,
-                y2: sceneY,
-              })
-              replaceCurrentSnapshotByReplacingElements({
-                replacedElement: { ...newElementWithoutId, id: resizingElementId },
-              })
-              dispatch({
-                type: validAction[uiState.state].continueResize,
-                data: { ...uiState.data },
-              })
-              return
-            }
-            // should not reach here
-            throw new Error(
-              'While resizing a line or arrow, the pointer position is not at either end of the line.'
-            )
-          } else if (
-            uiState.data.elementType === 'rectangle' &&
-            resizingElement.type === 'rectangle'
-          ) {
-            const newElementWithoutId = resizeRectangleElement({
-              newPointerPosition: { x: sceneX, y: sceneY },
-              pointerStartedAt: uiState.data.pointerPosition,
-              rectElementToResize: resizingElement,
-            })
-            replaceCurrentSnapshotByReplacingElements({
-              replacedElement: { ...newElementWithoutId, id: resizingElementId },
-            })
-            dispatch({
-              type: validAction[uiState.state].continueResize,
-              data: { ...uiState.data },
-            })
-            return
-          } else if (uiState.data.elementType === 'image' && resizingElement.type === 'image') {
-            const newElementWithoutId = resizeImageElement({
-              newPointerPosition: { x: sceneX, y: sceneY },
-              pointerStartedAt: uiState.data.pointerPosition,
-              imageElementToResize: resizingElement,
-            })
-            replaceCurrentSnapshotByReplacingElements({
-              replacedElement: { ...newElementWithoutId, id: resizingElementId },
-            })
-            dispatch({
-              type: validAction[uiState.state].continueResize,
-              data: { ...uiState.data },
-            })
-            return
-          } else {
-            throw new Error(
-              '1. Mismatch between resizing element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for resizing'
-            )
-          }
+          actions[validAction[uiState.state].continueResize]({ sceneX, sceneY, prevState: uiState })
+          return
         },
         handlePointerUp(e: React.PointerEvent) {
           if (!e.isPrimary) return
@@ -905,32 +519,11 @@ export function createPointerHandlers({
 
           // adjust coordinates to handle the case when resizing flips the rectangle
           if (uiState.data.elementType === 'rectangle') {
-            const resizingElementId = uiState.data.elementId
-            const resizingElement = getElementInCurrentSnapshot(resizingElementId)
-            if (!resizingElement || resizingElement.type !== 'rectangle') {
-              throw new Error('The resizing element is not a "rectangle" element')
-            }
-            const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(resizingElement)
-            const newElementWithoutId = createRectangleElementWithoutId({
-              x1: newX1,
-              y1: newY1,
-              width: newX2 - newX1,
-              height: newY2 - newY1,
-            })
-            replaceCurrentSnapshotByReplacingElements({
-              replacedElement: { ...newElementWithoutId, id: resizingElementId },
-            })
-            dispatch({
-              type: validAction[uiState.state].selectSingleElement,
-              data: { elementId: resizingElementId },
-            })
+            actions[validAction[uiState.state].flipThenSelectRectangle]({ prevState: uiState })
             return
           }
 
-          dispatch({
-            type: validAction[uiState.state].selectSingleElement,
-            data: { elementId: uiState.data.elementId },
-          })
+          actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
           return
         },
       }
@@ -953,16 +546,18 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
+            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
           // pointer down hits a different element than the current selected element
           const isHitOnUnselectedElement = hitPoint.foundLastElement.id !== uiState.data.elementId
           if (isHitOnUnselectedElement) {
             // allow to move only
-            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
-              hitPoint.foundLastElement,
-            ])
+            actions[validAction[uiState.state].prepareMove]({
+              sceneX,
+              sceneY,
+              elementsToMove: [hitPoint.foundLastElement],
+            })
             return
           }
 
@@ -970,9 +565,11 @@ export function createPointerHandlers({
           // we allow to either move or resize an element
           // ... so, we need to check which part of the element was clicked
           if (hitPoint.pointerPosition === 'onLine' || hitPoint.pointerPosition === 'inside') {
-            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, [
-              hitPoint.foundLastElement,
-            ])
+            actions[validAction[uiState.state].prepareMove]({
+              sceneX,
+              sceneY,
+              elementsToMove: [hitPoint.foundLastElement],
+            })
           } else if (
             hitPoint.pointerPosition === 'start' ||
             hitPoint.pointerPosition === 'end' ||
@@ -981,12 +578,9 @@ export function createPointerHandlers({
             hitPoint.pointerPosition === 'br' ||
             hitPoint.pointerPosition === 'bl'
           ) {
-            dispatch({
-              type: validAction[uiState.state].prepareResize,
-              data: createResizeData({
-                targetElement: hitPoint.foundLastElement,
-                pointerPosition: hitPoint.pointerPosition,
-              }),
+            actions[validAction[uiState.state].prepareResize]({
+              elementToResize: hitPoint.foundLastElement,
+              pointerPosition: hitPoint.pointerPosition,
             })
           } else {
             throw new Error(`${hitPoint.pointerPosition} pointer position is not supported`)
@@ -1019,7 +613,7 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect](sceneX, sceneY)
+            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
 
@@ -1035,15 +629,17 @@ export function createPointerHandlers({
           // pointer down hits on the current selected elements
           // we allow to move only
           if (isPointerHitOneOfSelectedElements) {
-            actions[validAction[uiState.state].prepareMove](sceneX, sceneY, currentSelectedElements)
+            actions[validAction[uiState.state].prepareMove]({
+              sceneX,
+              sceneY,
+              elementsToMove: currentSelectedElements,
+            })
             return
           }
           // pointer down hits on a different element than the current selected elements
           // we reset state
           else {
-            dispatch({
-              type: validAction[uiState.state].reset,
-            })
+            actions[validAction[uiState.state].reset]()
             return
           }
         },
