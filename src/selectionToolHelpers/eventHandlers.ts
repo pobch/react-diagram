@@ -1,9 +1,9 @@
 /* eslint-disable no-extra-label */
 import * as React from 'react'
+import { flushSync } from 'react-dom'
 import { TElementData, TSnapshot } from '../App'
 import { getElementsInSnapshot, TCursorType } from '../CanvasForSelection'
 import { getTextElementAtPosition } from '../CanvasForText'
-import { singletonThrottle } from '../helpers/throttle'
 import { TUiState, useSelectionMachine, validAction } from './useSelectionMachine'
 
 function getLastElementAtPosition({
@@ -387,11 +387,10 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
 
-          // wrap in throttle because the following code need to be called at most once
+          handleCursorUI(e)
+          // wrap in flushSync because the following code need to be called at most once
           // https://github.com/pobch/react-diagram/issues/27
-          singletonThrottle(() => {
-            handleCursorUI(e)
-
+          flushSync(() => {
             // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
             actions[validAction[uiState.state].startMove]({ prevState: uiState })
             return
@@ -441,8 +440,6 @@ export function createPointerHandlers({
         },
         handlePointerUp(e: React.PointerEvent) {
           if (!e.isPrimary) return
-          // reset the throttle timer that comes from the previous state's onPointerMove()
-          singletonThrottle.cancel()
 
           // should come from onPointerMove() of the same previous same state: 'moving'
           if (uiState.data.length === 0) {
@@ -467,11 +464,10 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
 
-          // wrap in throttle because the following code need to be called at most once
+          handleCursorUI(e)
+          // wrap in flushSync because the following code need to be called at most once
           // https://github.com/pobch/react-diagram/issues/27
-          singletonThrottle(() => {
-            handleCursorUI(e)
-
+          flushSync(() => {
             // should come from onPointerDown() of 'singleElementSelected' state
             actions[validAction[uiState.state].startResize]({ prevState: uiState })
             return
@@ -512,8 +508,6 @@ export function createPointerHandlers({
         },
         handlePointerUp(e: React.PointerEvent) {
           if (!e.isPrimary) return
-          // reset the throttle timer that comes from the previous state's onPointerMove()
-          singletonThrottle.cancel()
 
           // should come from onPointerMove() of the same previous same state: 'resizing'
 

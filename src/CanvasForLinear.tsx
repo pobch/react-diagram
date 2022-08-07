@@ -1,9 +1,9 @@
 import * as React from 'react'
 import { useState } from 'react'
+import { flushSync } from 'react-dom'
 import rough from 'roughjs/bundled/rough.esm'
 import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
-import { singletonThrottle } from './helpers/throttle'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
@@ -145,9 +145,9 @@ export function CanvasForLinear({
 
     // should come from onPointerDown()
     if (uiState.state === 'initDraw') {
-      // wrap in throttle because the following code need to be called at most once
+      // wrap in flushSync because the following code need to be called at most once
       // https://github.com/pobch/react-diagram/issues/27
-      singletonThrottle(() => {
+      flushSync(() => {
         const { sceneX, sceneY } = viewportCoordsToSceneCoords({
           viewportX: e.clientX,
           viewportY: e.clientY,
@@ -208,9 +208,6 @@ export function CanvasForLinear({
     }
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
-      // reset the throttle timer that comes from the previous state's onPointerMove()
-      singletonThrottle.cancel()
-
       setUiState({ state: 'none' })
       return
     }
