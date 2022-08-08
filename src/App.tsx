@@ -379,6 +379,7 @@ export function App() {
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
+    const height = Math.max(window.innerHeight, document.documentElement.clientHeight)
     return (
       <canvas
         ref={canvasRef}
@@ -386,7 +387,7 @@ export function App() {
           backgroundColor: 'AliceBlue',
           display: 'block',
           width: window.innerWidth,
-          height: window.innerHeight,
+          height: height,
 
           // disable all touch behavior from browser, e.g. touch to scroll
           touchAction: 'none',
@@ -394,7 +395,7 @@ export function App() {
           ...(styleCursor ? { cursor: styleCursor } : {}),
         }}
         width={window.innerWidth * dpr}
-        height={window.innerHeight * dpr}
+        height={height * dpr}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
