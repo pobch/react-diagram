@@ -14,7 +14,7 @@ body {
 
   /* TODO: Find a better way to resolve horizontal & vertical scrollbar in Chrome (Windows 10) */
   /* https://github.com/pobch/react-diagram/issues/15 */
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 code {
