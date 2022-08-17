@@ -379,22 +379,25 @@ export function App() {
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
+    // Why not window.innerHeight / innerWidth ? https://github.com/pobch/react-diagram/pull/35
+    const fullHeight = document.documentElement.clientHeight
+    const fullWidth = document.documentElement.clientWidth
     return (
       <canvas
         ref={canvasRef}
         style={{
           backgroundColor: 'AliceBlue',
           display: 'block',
-          width: window.innerWidth,
-          height: window.innerHeight,
+          width: fullWidth,
+          height: fullHeight,
 
           // disable all touch behavior from browser, e.g. touch to scroll
           touchAction: 'none',
 
           ...(styleCursor ? { cursor: styleCursor } : {}),
         }}
-        width={window.innerWidth * dpr}
-        height={window.innerHeight * dpr}
+        width={fullWidth * dpr}
+        height={fullHeight * dpr}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
