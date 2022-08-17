@@ -12,9 +12,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* TODO: Find a better way to resolve horizontal & vertical scrollbar in Chrome (Windows 10) */
-  /* https://github.com/pobch/react-diagram/issues/15 */
-  /* overflow: hidden; */
+  /* A safety net in case an accidental scrollbar appears because of the canvas size(a child of <body>) */
+  overflow: hidden;
 }
 
 code {
