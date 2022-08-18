@@ -363,7 +363,6 @@ export function CanvasForText({
                       }
                       return prev
                     })
-                    e.target.scrollIntoView()
                   }}
                 />
                 <div style={styledButtonWrapper}>
