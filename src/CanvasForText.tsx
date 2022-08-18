@@ -337,9 +337,6 @@ export function CanvasForText({
                 <textarea
                   style={styledTextArea}
                   autoFocus
-                  onFocus={(e) => {
-                    e.target.scrollIntoView()
-                  }}
                   ref={textareaRef}
                   onChange={(e) => {
                     // Shrink-then-expand the textarea to make it fits the content
@@ -366,6 +363,7 @@ export function CanvasForText({
                       }
                       return prev
                     })
+                    e.target.scrollIntoView()
                   }}
                 />
                 <div style={styledButtonWrapper}>
