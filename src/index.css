@@ -13,7 +13,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 
   /* A safety net in case an accidental scrollbar appears because of the canvas size(a child of <body>) */
-  overflow: hidden;
+  /* overflow: hidden; */
 }
 
 code {
