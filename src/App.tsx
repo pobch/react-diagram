@@ -11,7 +11,6 @@ import { CanvasForHand } from './CanvasForHand'
 import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
-import { useHandleCanvasResize } from './useHandleCanvasResize'
 import { ImageUploadButton } from './ImageUploadButton'
 
 export type TElementData =
