@@ -361,7 +361,11 @@ export function App() {
   // However, `drawScene()` is currently called in multiple places with different args,
   // ... e.g. in this component(without args) and in <CanvasForSelection/> (with args).
   // That creates another complexity.
-  useHandleCanvasResize(canvasRef)
+  // useHandleCanvasResize(canvasRef)
+  const [canvasSize] = useState({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+  })
 
   // * --------------- Reusable renderProps ---------------
   function renderCanvas({
@@ -380,24 +384,24 @@ export function App() {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
     // Why not window.innerHeight / innerWidth ? https://github.com/pobch/react-diagram/pull/35
-    const fullHeight = window.innerHeight
-    const fullWidth = window.innerWidth
+    // const fullHeight = window.innerHeight
+    // const fullWidth = window.innerWidth
     return (
       <canvas
         ref={canvasRef}
         style={{
           backgroundColor: 'AliceBlue',
           display: 'block',
-          width: fullWidth,
-          height: fullHeight,
+          width: canvasSize.width,
+          height: canvasSize.height,
 
           // disable all touch behavior from browser, e.g. touch to scroll
           touchAction: 'none',
 
           ...(styleCursor ? { cursor: styleCursor } : {}),
         }}
-        width={fullWidth * dpr}
-        height={fullHeight * dpr}
+        width={canvasSize.width * dpr}
+        height={canvasSize.height * dpr}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
