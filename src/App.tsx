@@ -373,9 +373,6 @@ export function App() {
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
-    // Why not window.innerHeight / innerWidth ? https://github.com/pobch/react-diagram/pull/35
-    // const fullHeight = window.innerHeight
-    // const fullWidth = window.innerWidth
     return (
       <canvas
         ref={canvasRef}
