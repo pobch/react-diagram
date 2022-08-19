@@ -11,8 +11,9 @@ import { CanvasForHand } from './CanvasForHand'
 import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
-import { useHandleCanvasResize } from './useHandleCanvasResize'
 import { ImageUploadButton } from './ImageUploadButton'
+import { zIndex } from './helpers/zIndex'
+import { useCanvasSize } from './useCanvasSize'
 
 export type TElementData =
   | {
@@ -354,16 +355,9 @@ export function App() {
     tool,
   ])
 
-  // * ------------ Handle Viewport Resizing ------------
-
-  // ?? This approach is more likely a hack.
-  // The more straightforward way is to call `drawScene()` whenever the viewport is resized.
-  // However, `drawScene()` is currently called in multiple places with different args,
-  // ... e.g. in this component(without args) and in <CanvasForSelection/> (with args).
-  // That creates another complexity.
-  useHandleCanvasResize(canvasRef)
-
   // * --------------- Reusable renderProps ---------------
+  const { canvasSize, recalculateCanvasSize } = useCanvasSize()
+
   function renderCanvas({
     onPointerDown,
     onPointerMove,
@@ -379,25 +373,22 @@ export function App() {
   }) {
     // Get the device pixel ratio, falling back to 1.
     const dpr = window.devicePixelRatio || 1
-    // Why not window.innerHeight / innerWidth ? https://github.com/pobch/react-diagram/pull/35
-    const fullHeight = document.documentElement.clientHeight
-    const fullWidth = document.documentElement.clientWidth
     return (
       <canvas
         ref={canvasRef}
         style={{
           backgroundColor: 'AliceBlue',
           display: 'block',
-          width: fullWidth,
-          height: fullHeight,
+          width: canvasSize.width,
+          height: canvasSize.height,
 
           // disable all touch behavior from browser, e.g. touch to scroll
           touchAction: 'none',
 
           ...(styleCursor ? { cursor: styleCursor } : {}),
         }}
-        width={fullWidth * dpr}
-        height={fullHeight * dpr}
+        width={canvasSize.width * dpr}
+        height={canvasSize.height * dpr}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
@@ -484,6 +475,7 @@ export function App() {
           margin: '0.5rem',
           padding: '0.25rem',
           backgroundColor: 'white',
+          zIndex: zIndex[20],
         }}
       >
         <legend>Tool</legend>
@@ -519,8 +511,8 @@ export function App() {
       </fieldset>
 
       {/* Footer Menu */}
-      <div style={{ position: 'fixed', bottom: 0, padding: '1rem' }}>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+      <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="undo" onClick={() => undo()} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
@@ -531,14 +523,18 @@ export function App() {
           <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
         </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
         </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <CmdButton cmdName="fitToScreen" onClick={recalculateCanvasSize} />
         </span>
       </div>
 

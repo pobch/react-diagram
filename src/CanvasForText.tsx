@@ -281,7 +281,7 @@ export function CanvasForText({
   }
 
   return (
-    <>
+    <div style={{ position: 'relative' }}>
       {/* // TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
@@ -299,7 +299,7 @@ export function CanvasForText({
         let styledButtonWrapper: React.CSSProperties | undefined
         if (uiState.state === 'creating' || uiState.state === 'updating') {
           styledFloatingWrapper = {
-            position: 'fixed',
+            position: 'absolute',
             top: sceneCoordsToViewportCoords({
               sceneX: uiState.data.textareaX1,
               sceneY: uiState.data.textareaY1,
@@ -431,6 +431,6 @@ export function CanvasForText({
         onClick: handleClick,
         styleCursor: cursorType,
       })}
-    </>
+    </div>
   )
 }
