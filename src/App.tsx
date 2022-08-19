@@ -515,7 +515,7 @@ export function App() {
 
       {/* Footer Menu */}
       <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="undo" onClick={() => undo()} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>
@@ -526,10 +526,10 @@ export function App() {
           <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
         </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
         </span>
         <span style={{ paddingInlineEnd: '1rem' }}>

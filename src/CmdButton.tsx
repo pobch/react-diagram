@@ -39,7 +39,7 @@ export function CmdButton({
   }
 
   return (
-    <button onClick={onClick} style={{ paddingInline: '0.5rem' }}>
+    <button onClick={onClick}>
       <img
         src={srcMap[cmdName]}
         alt={cmdName}
