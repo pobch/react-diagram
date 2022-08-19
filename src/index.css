@@ -11,9 +11,6 @@ body {
     'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  /* A safety net in case an accidental scrollbar appears because of the canvas size(a child of <body>) */
-  overflow: hidden;
 }
 
 code {
@@ -24,7 +21,7 @@ button {
   padding: 0.125rem;
   border-radius: 0;
   border: 1px solid #0ea5e9; /* sky-500 */
-  background-color: #bae6fd; /* sky-200 */
+  background-color: #e0f2fe; /* sky-100 */
 }
 
 button:active,
