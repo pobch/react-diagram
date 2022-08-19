@@ -12,6 +12,7 @@ import { ToolRadio } from './ToolRadio'
 import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
 import { ImageUploadButton } from './ImageUploadButton'
+import { zIndex } from './helpers/zIndex'
 
 export type TElementData =
   | {
@@ -487,7 +488,7 @@ export function App() {
           margin: '0.5rem',
           padding: '0.25rem',
           backgroundColor: 'white',
-          zIndex: 20,
+          zIndex: zIndex[20],
         }}
       >
         <legend>Tool</legend>
@@ -523,7 +524,7 @@ export function App() {
       </fieldset>
 
       {/* Footer Menu */}
-      <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: 20 }}>
+      <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <CmdButton cmdName="undo" onClick={() => undo()} />
         </span>

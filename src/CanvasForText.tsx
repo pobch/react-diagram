@@ -281,7 +281,7 @@ export function CanvasForText({
   }
 
   return (
-    <div style={{ position: 'relative', zIndex: 10 }}>
+    <div style={{ position: 'relative' }}>
       {/* // TODO: find better approach for measure text dimension */}
       <canvas
         ref={canvasForMeasureRef}
