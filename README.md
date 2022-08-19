@@ -61,3 +61,7 @@ The following functions are temporary. Mostly use for debugging. In the future, 
 
 - `exportSnapshot()` to export the diagram (must not have any image element)
 - `importSnapshot(value)` to import, `value` is the result of calling `exportSnapshot()` (must not have any image element)
+
+### Icons
+
+https://phosphoricons.com/

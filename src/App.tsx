@@ -13,6 +13,7 @@ import { CmdButton } from './CmdButton'
 import { CONFIG } from './config'
 import { ImageUploadButton } from './ImageUploadButton'
 import { zIndex } from './helpers/zIndex'
+import { useCanvasSize } from './useCanvasSize'
 
 export type TElementData =
   | {
@@ -354,20 +355,9 @@ export function App() {
     tool,
   ])
 
-  // * ------------ Handle Viewport Resizing ------------
-
-  // ?? This approach is more likely a hack.
-  // The more straightforward way is to call `drawScene()` whenever the viewport is resized.
-  // However, `drawScene()` is currently called in multiple places with different args,
-  // ... e.g. in this component(without args) and in <CanvasForSelection/> (with args).
-  // That creates another complexity.
-  // useHandleCanvasResize(canvasRef)
-  const [canvasSize] = useState({
-    width: document.documentElement.clientWidth,
-    height: document.documentElement.clientHeight,
-  })
-
   // * --------------- Reusable renderProps ---------------
+  const { canvasSize, recalculateCanvasSize } = useCanvasSize()
+
   function renderCanvas({
     onPointerDown,
     onPointerMove,
@@ -542,8 +532,12 @@ export function App() {
         <span style={{ paddingInlineEnd: '0.5rem' }}>
           <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
         </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
+        <span style={{ paddingInlineEnd: '1rem' }}>
           <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
+        </span>
+        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+        <span style={{ paddingInlineEnd: '1rem' }}>
+          <CmdButton cmdName="fitToScreen" onClick={recalculateCanvasSize} />
         </span>
       </div>
 
