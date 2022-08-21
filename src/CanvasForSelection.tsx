@@ -56,8 +56,6 @@ export function getElementsInSnapshot(
   return foundElementsInSnapshot
 }
 
-// * -------------------------- End ------------------------------
-
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 
 /**

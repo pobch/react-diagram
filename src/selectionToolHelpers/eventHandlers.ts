@@ -268,14 +268,13 @@ export function createPointerHandlers({
   }
   setCursorType: React.Dispatch<React.SetStateAction<TCursorType>>
 }) {
+  // TODO: Move `cursorType` to the state machine as a state machine's context.
   function handleCursorUI(e: React.PointerEvent) {
     const { sceneX, sceneY } = viewportCoordsToSceneCoords({
       viewportX: e.clientX,
       viewportY: e.clientY,
     })
 
-    // cursor UI for all uiState
-    // TODO: Add state guard and separate cursor between "none" and other state
     const { pointerPosition: hoveringPosition } = getLastElementAtPosition({
       elementsSource: currentSnapshot,
       xPosition: sceneX,
@@ -345,8 +344,6 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
 
-          handleCursorUI(e)
-
           // can come from either
           // - onPointerDown() of previous 'none' || 'singleElementSelected' || 'multiElementSelected' state
           // - onPointerMove() of the previous same state: 'areaSelecting'
@@ -387,7 +384,6 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
 
-          handleCursorUI(e)
           // wrap in flushSync because the following code need to be called at most once
           // https://github.com/pobch/react-diagram/issues/27
           flushSync(() => {
@@ -423,8 +419,6 @@ export function createPointerHandlers({
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
-
-          handleCursorUI(e)
 
           // can come from either
           // - onPointerMove() of previous 'readyToMove' state (when we start to move)
@@ -464,7 +458,6 @@ export function createPointerHandlers({
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
 
-          handleCursorUI(e)
           // wrap in flushSync because the following code need to be called at most once
           // https://github.com/pobch/react-diagram/issues/27
           flushSync(() => {
@@ -491,8 +484,6 @@ export function createPointerHandlers({
         handlePointerDown(e: React.PointerEvent) {},
         handlePointerMove(e: React.PointerEvent) {
           if (!e.isPrimary) return
-
-          handleCursorUI(e)
 
           // can come from either
           // - onPointerMove() of previous 'readyToResize' state (when we start to resize)
