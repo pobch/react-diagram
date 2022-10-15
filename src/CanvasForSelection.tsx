@@ -2,7 +2,7 @@ import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
 import {
   getSvgPathFromStroke,
-  TCommitNewSnapshotParam,
+  TCommitNewSnapshotFn,
   TElementData,
   TReplaceCurrentSnapshotParam,
   TSnapshot,
@@ -80,7 +80,7 @@ export function CanvasForSelection({
   }) => React.ReactElement
   currentSnapshot: TSnapshot
   getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number

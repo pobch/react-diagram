@@ -1,4 +1,4 @@
-import { TCommitNewSnapshotParam, TElementData } from './App'
+import { TCommitNewSnapshotFn, TElementData } from './App'
 import iconSrc from './assets/image.svg'
 
 export function ImageUploadButton({
@@ -6,7 +6,7 @@ export function ImageUploadButton({
   scenePositionToDrawImage,
   onUploadSuccess,
 }: {
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | void
+  commitNewSnapshot: TCommitNewSnapshotFn
   scenePositionToDrawImage: { x1: number; y1: number }
   onUploadSuccess: () => void
 }) {
@@ -24,15 +24,17 @@ export function ImageUploadButton({
           if (!file) return
           createImageBitmap(file).then((imageBitmap) => {
             commitNewSnapshot({
-              mode: 'addElement',
-              newElementWithoutId: {
-                type: 'image',
-                x1: scenePositionToDrawImage.x1,
-                y1: scenePositionToDrawImage.y1,
-                x2: scenePositionToDrawImage.x1 + imageBitmap.width,
-                y2: scenePositionToDrawImage.y1 + imageBitmap.height,
-                data: imageBitmap,
-              },
+              mode: 'addElements',
+              newElementWithoutIds: [
+                {
+                  type: 'image',
+                  x1: scenePositionToDrawImage.x1,
+                  y1: scenePositionToDrawImage.y1,
+                  x2: scenePositionToDrawImage.x1 + imageBitmap.width,
+                  y2: scenePositionToDrawImage.y1 + imageBitmap.height,
+                  data: imageBitmap,
+                },
+              ],
             })
 
             // make onChange being triggered again even though the user select the same image

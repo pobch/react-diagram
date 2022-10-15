@@ -1,10 +1,5 @@
 import { useRef, useState } from 'react'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from './App'
+import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam, TSnapshot } from './App'
 import { CmdButton } from './CmdButton'
 
 export function getTextElementAtPosition({
@@ -98,7 +93,7 @@ export function CanvasForText({
   }) => React.ReactElement
   currentSnapshot: TSnapshot
   getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   replaceCurrentSnapshotByRemovingElement: (elementId: number) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
@@ -250,7 +245,7 @@ export function CanvasForText({
         y1: uiState.data.textareaY1,
         isWriting: false,
       })
-      commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
+      commitNewSnapshot({ mode: 'addElements', newElementWithoutIds: [newElementWithoutId] })
       setUiState({ state: 'none' })
       return
     }
