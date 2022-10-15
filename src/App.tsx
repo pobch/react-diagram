@@ -56,9 +56,9 @@ export type TSnapshot = TElementData[]
 
 type DistributiveOmit<T, K extends PropertyKey> = T extends any ? Omit<T, K> : never
 
-export type TCommitNewSnapshotParam =
+type TCommitNewSnapshotParam =
   | { mode: 'clone' }
-  | { mode: 'addElement'; newElementWithoutId: DistributiveOmit<TElementData, 'id'> }
+  | { mode: 'addElements'; newElementWithoutIds: DistributiveOmit<TElementData, 'id'>[] }
   | { mode: 'removeElements'; elementIds: number[] }
   | { mode: 'removeAllElement' }
   | { mode: 'modifyElement'; modifiedElement: TElementData }
@@ -91,12 +91,14 @@ function useHistory() {
     let newSnapshot: TSnapshot = []
     if (options.mode === 'clone') {
       newSnapshot = [...currentSnapshot]
-    } else if (options.mode === 'addElement') {
-      const newElement = {
-        ...options.newElementWithoutId,
-        id: Date.now(),
-      }
-      newSnapshot = [...currentSnapshot, newElement]
+    } else if (options.mode === 'addElements') {
+      const newElements = options.newElementWithoutIds.map((newElementWithoutId) => {
+        return {
+          ...newElementWithoutId,
+          id: Date.now(),
+        }
+      })
+      newSnapshot = [...currentSnapshot, ...newElements]
     } else if (options.mode === 'removeElements') {
       newSnapshot = [...currentSnapshot]
       let willRemoveIdsMap: Record<number, boolean> = {}
@@ -119,11 +121,10 @@ function useHistory() {
       return newHistory
     })
 
-    // for "addElement" mode, we also return new element's id
-    if (options.mode === 'addElement') {
-      const lastElementInNewSnapshot = newSnapshot.at(-1)
-      if (!lastElementInNewSnapshot) throw new Error('The new snapshot is empty!!')
-      return lastElementInNewSnapshot.id
+    // for "addElements" mode, we also return an array of new element's id
+    if (options.mode === 'addElements') {
+      const lastElementsInNewSnapshot = newSnapshot.slice(-options.newElementWithoutIds.length)
+      return lastElementsInNewSnapshot.map((element) => element.id)
     }
     return
   }
@@ -210,6 +211,8 @@ function useHistory() {
     DEBUG_importSnapshot,
   }
 }
+
+export type TCommitNewSnapshotFn = ReturnType<typeof useHistory>['commitNewSnapshot']
 
 // copy from perfect-freehand doc
 export function getSvgPathFromStroke(stroke: number[][]) {

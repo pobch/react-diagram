@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useState } from 'react'
 import { flushSync } from 'react-dom'
 import rough from 'roughjs/bundled/rough.esm'
-import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
+import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
@@ -109,7 +109,7 @@ export function CanvasForLinear({
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
   getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
@@ -160,11 +160,14 @@ export function CanvasForLinear({
           y2: sceneY,
         })
 
-        const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
-        if (newId === undefined) {
+        const newIds = commitNewSnapshot({
+          mode: 'addElements',
+          newElementWithoutIds: [newElementWithoutId],
+        })
+        if (newIds === undefined || newIds[0] == null) {
           throw new Error(`ID of the drawing ${lineType} element is missing`)
         }
-        setUiState({ state: 'drawing', data: { elementId: newId } })
+        setUiState({ state: 'drawing', data: { elementId: newIds[0] } })
         return
       })
     }

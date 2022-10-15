@@ -1,10 +1,5 @@
 import { useCallback, useReducer } from 'react'
-import {
-  TCommitNewSnapshotParam,
-  TElementData,
-  TReplaceCurrentSnapshotParam,
-  TSnapshot,
-} from '../App'
+import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam, TSnapshot } from '../App'
 import { createLinearElementWithoutId } from '../CanvasForLinear'
 import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../CanvasForRect'
 import { createTextElementWithoutId } from '../CanvasForText'
@@ -242,7 +237,7 @@ export function useSelectionMachine({
 }: {
   currentSnapshot: TSnapshot
   getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
 }) {

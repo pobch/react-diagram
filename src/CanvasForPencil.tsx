@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TCommitNewSnapshotParam, TElementData, TReplaceCurrentSnapshotParam } from './App'
+import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam } from './App'
 
 function createPencilElementWithoutId({
   newX,
@@ -45,7 +45,7 @@ export function CanvasForPencil({
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
   getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
-  commitNewSnapshot: (arg: TCommitNewSnapshotParam) => number | undefined
+  commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
@@ -69,13 +69,16 @@ export function CanvasForPencil({
         newX: sceneX,
         newY: sceneY,
       })
-      const newId = commitNewSnapshot({ mode: 'addElement', newElementWithoutId })
-      if (newId === undefined) {
+      const newIds = commitNewSnapshot({
+        mode: 'addElements',
+        newElementWithoutIds: [newElementWithoutId],
+      })
+      if (newIds === undefined || newIds[0] == null) {
         throw new Error('ID of the drawing pencil element is missing')
       }
       setUiState({
         state: 'drawing',
-        data: { elementId: newId },
+        data: { elementId: newIds[0] },
       })
       return
     }
