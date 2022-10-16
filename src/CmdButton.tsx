@@ -7,6 +7,7 @@ import clearCanvasSrc from './assets/delete.svg'
 import deleteElementSrc from './assets/x-circle.svg'
 import doneEditingTextSrc from './assets/plus.svg'
 import fitToScreenSrc from './assets/fit-screen.svg'
+import duplicateSrc from './assets/duplicate.svg'
 
 export function CmdButton({
   cmdName,
@@ -23,6 +24,7 @@ export function CmdButton({
     | 'deleteElement'
     | 'doneEditingText'
     | 'fitToScreen'
+    | 'duplicate'
   onClick: (e: React.MouseEvent) => void
   iconWidth?: number
 }) {
@@ -36,10 +38,11 @@ export function CmdButton({
     deleteElement: deleteElementSrc,
     doneEditingText: doneEditingTextSrc,
     fitToScreen: fitToScreenSrc,
+    duplicate: duplicateSrc,
   }
 
   return (
-    <button onClick={onClick}>
+    <button type="button" onClick={onClick}>
       <img
         src={srcMap[cmdName]}
         alt={cmdName}
