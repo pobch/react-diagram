@@ -344,6 +344,18 @@ export function CanvasForSelection({
               Dup
             </button>
           )}
+          {uiState.state === 'multiElementSelected' && (
+            <button
+              type="button"
+              onClick={() => {
+                actionWithSideEffect.duplicateSelectedMultipleElements({
+                  originalElementIds: uiState.data.elementIds,
+                })
+              }}
+            >
+              Dup
+            </button>
+          )}
         </div>
       ) : null}
 

@@ -92,10 +92,11 @@ function useHistory() {
     if (options.mode === 'clone') {
       newSnapshot = [...currentSnapshot]
     } else if (options.mode === 'addElements') {
-      const newElements = options.newElementWithoutIds.map((newElementWithoutId) => {
+      const newElements = options.newElementWithoutIds.map((newElementWithoutId, i) => {
         return {
           ...newElementWithoutId,
-          id: Date.now(),
+          // Also plus a unique number to prevent the case that multiple elements get the same id
+          id: Date.now() + i,
         }
       })
       newSnapshot = [...currentSnapshot, ...newElements]
