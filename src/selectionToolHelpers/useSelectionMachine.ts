@@ -2,6 +2,7 @@ import { useCallback, useReducer } from 'react'
 import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam, TSnapshot } from '../App'
 import { createLinearElementWithoutId } from '../CanvasForLinear'
 import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../CanvasForRect'
+import { getElementsInSnapshot } from '../CanvasForSelection'
 import { createTextElementWithoutId } from '../CanvasForText'
 import { moveImageElement, moveRectangleElement } from './moveHelpers'
 import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
@@ -636,8 +637,35 @@ export function useSelectionMachine({
       // We switch to select the new duplicated element, instead of the original element
       dispatch({ type: 'duplicateSelectedSingleElements', data: { elementId: newIds[0] } })
     },
-    duplicateSelectedMultipleElements: () => {
-      // TODO: Implement this
+    duplicateSelectedMultipleElements: ({
+      originalElementIds,
+    }: {
+      originalElementIds: number[]
+    }) => {
+      // Steps are similar to `duplicateSelectedSingleElements`. Read its comments for explanation.
+      const originalElements = getElementsInSnapshot(currentSnapshot, originalElementIds)
+      const moveDistanceSceneY = 50
+      const moveDataArray = createMoveDataArray({
+        targetElements: originalElements,
+        pointerX: 0,
+        pointerY: 0,
+      })
+      const newDuplicatedElements = createMovedElements({
+        moveDataArray: moveDataArray,
+        getOriginalElementFromId: (id) => originalElements.find((element) => element.id === id),
+        canvasForMeasureTextRef: canvasForMeasureRef,
+        newPointerSceneX: 0,
+        newPointerSceneY: moveDistanceSceneY,
+      })
+      const newIds = commitNewSnapshot({
+        mode: 'addElements',
+        newElementWithoutIds: newDuplicatedElements,
+      })
+      if (newIds === undefined || newIds.length !== originalElements.length) {
+        throw new Error('Some IDs of new duplicated elements are missing')
+      }
+      // We switch to select the new duplicated elements, instead of the original elements
+      dispatch({ type: 'duplicateSelectedMultipleElements', data: { elementIds: newIds } })
     },
   } as const
 
