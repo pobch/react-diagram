@@ -25,17 +25,19 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [x] Pan
 - [x] Zoom
 - [x] CSS & Styling
-- [ ] Mobile & Resizing friendly
+- [x] Mobile & Resizing friendly
 - [x] Multi-select elements
-- [ ] Copy & Paste elements
-- [ ] Save the result to file / local storage
-- [ ] Rotate
 - [x] Support uploading an image
+- [x] Duplicate elements
 - [ ] Send to back/front
+- [ ] Save the result to file / local storage (need to serialize the image)
+- [ ] Rotate
+- [ ] Keyboard shortcut
 - [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
 - [ ] Setting stroke width
 - [ ] Filled rectangle
+- [ ] Copy & Paste elements (upgrade "Duplicate" feature)
 
 ## Developer Notes
 
@@ -71,7 +73,7 @@ https://phosphoricons.com/
 - Most of x, y value are in `scene` coordinate (i.e. canvas coord, not viewport coord). They are inconsistency in naming. For example,
   ```js
   // All of these variable names are in `scene` coord
-  let sceneX, x1, pointerX
+  let sceneX, x1, x2, pointerX
   ```
 - However, the `viewport` coordinate is more consistency in naming.
   ```js
