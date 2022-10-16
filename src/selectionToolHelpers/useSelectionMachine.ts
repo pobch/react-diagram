@@ -47,6 +47,12 @@ export type TAreaSelectData = {
     y2: number
   }
 }
+type TSingleSelectData = {
+  elementId: number
+}
+type TMultiSelectData = {
+  elementIds: number[]
+}
 
 export type TUiState =
   | {
@@ -74,15 +80,11 @@ export type TUiState =
     }
   | {
       state: 'singleElementSelected'
-      data: {
-        elementId: number
-      }
+      data: TSingleSelectData
     }
   | {
       state: 'multiElementSelected'
-      data: {
-        elementIds: number[]
-      }
+      data: TMultiSelectData
     }
 
 type TAction =
@@ -94,11 +96,13 @@ type TAction =
   | { type: 'prepareResize'; data: TResizeData }
   | { type: 'startResize'; data: TResizeData }
   | { type: 'continueResize'; data: TResizeData }
-  | { type: 'selectSingleElement'; data: { elementId: number } }
-  | { type: 'flipThenSelectRectangle'; data: { elementId: number } }
-  | { type: 'selectMultipleElements'; data: { elementIds: number[] } }
+  | { type: 'selectSingleElement'; data: TSingleSelectData }
+  | { type: 'flipThenSelectRectangle'; data: TSingleSelectData }
+  | { type: 'selectMultipleElements'; data: TMultiSelectData }
   | { type: 'reset' }
   | { type: 'removeSelectedElements' }
+  | { type: 'duplicateSelectedSingleElements'; data: TSingleSelectData }
+  | { type: 'duplicateSelectedMultipleElements'; data: TMultiSelectData }
 
 type TAllActionNames = TAction['type']
 
@@ -142,12 +146,14 @@ export const validAction = {
     prepareDragSelect: 'prepareDragSelect',
     reset: 'reset',
     removeSelectedElements: 'removeSelectedElements',
+    duplicateSelectedSingleElements: 'duplicateSelectedSingleElements',
   },
   multiElementSelected: {
     prepareMove: 'prepareMove',
     prepareDragSelect: 'prepareDragSelect',
     reset: 'reset',
     removeSelectedElements: 'removeSelectedElements',
+    duplicateSelectedMultipleElements: 'duplicateSelectedMultipleElements',
   },
 } as const
 
@@ -170,6 +176,9 @@ const mapActionNameToNextStateName = {
   reset: 'none',
 
   removeSelectedElements: 'none',
+
+  duplicateSelectedSingleElements: 'singleElementSelected',
+  duplicateSelectedMultipleElements: 'multiElementSelected',
 } as const
 
 function reducer(prevState: TUiState, action: TAction): TUiState {
@@ -222,7 +231,17 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
       const nextStateName = mapActionNameToNextStateName[action.type]
       return { state: nextStateName }
     }
+    case 'duplicateSelectedSingleElements': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
+    case 'duplicateSelectedMultipleElements': {
+      const nextStateName = mapActionNameToNextStateName[action.type]
+      return { state: nextStateName, data: action.data }
+    }
     default: {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const remainingActionType: never = action
       throw new Error('Unsupported action type inside the reducer')
     }
   }
@@ -242,7 +261,7 @@ export function useSelectionMachine({
   canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
   const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
-  const actions = {
+  const actionWithSideEffect = {
     prepareDragSelect: ({ sceneX, sceneY }: { sceneX: number; sceneY: number }) => {
       dispatch({
         type: 'prepareDragSelect',
@@ -420,101 +439,17 @@ export function useSelectionMachine({
     }) => {
       switch (prevState.state) {
         case 'moving': {
-          // store all moving elements, will be used to replace the current snapshot
-          let replacedMultiElements: TElementData[] = []
-
-          // create new element for replacing, one-by-one
-          prevState.data.forEach((moveData) => {
-            const movingElementId = moveData.elementId
-
-            const movingElementInSnapshot = getElementInCurrentSnapshot(movingElementId)
-            if (!movingElementInSnapshot) {
-              throw new Error(
-                'You are trying to move an non-exist element in the current snapshot!!'
-              )
-            }
-            if (
-              (moveData.elementType === 'line' && movingElementInSnapshot.type === 'line') ||
-              (moveData.elementType === 'arrow' && movingElementInSnapshot.type === 'arrow')
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              // keep existing line width
-              const distanceX = movingElementInSnapshot.x2 - movingElementInSnapshot.x1
-              const distanceY = movingElementInSnapshot.y2 - movingElementInSnapshot.y1
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: movingElementInSnapshot.type,
-                x1: newX1,
-                y1: newY1,
-                x2: newX1 + distanceX,
-                y2: newY1 + distanceY,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'rectangle' &&
-              movingElementInSnapshot.type === 'rectangle'
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              const newElementWithoutId = moveRectangleElement({
-                newX1: newX1,
-                newY1: newY1,
-                rectElementToMove: movingElementInSnapshot,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'image' &&
-              movingElementInSnapshot.type === 'image'
-            ) {
-              const newX1 = sceneX - moveData.pointerOffsetX1
-              const newY1 = sceneY - moveData.pointerOffsetY1
-              const newElementWithoutId = moveImageElement({
-                newX1: newX1,
-                newY1: newY1,
-                imageElementToMove: movingElementInSnapshot,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else if (
-              moveData.elementType === 'pencil' &&
-              movingElementInSnapshot.type === 'pencil'
-            ) {
-              const newPoints = moveData.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
-                x: sceneX - offsetX,
-                y: sceneY - offsetY,
-              }))
-              const newElement: TElementData = {
-                id: movingElementId,
-                type: 'pencil',
-                points: newPoints,
-              }
-              replacedMultiElements.push(newElement)
-              // continue forEach loop
-              return
-            } else if (moveData.elementType === 'text' && movingElementInSnapshot.type === 'text') {
-              const newElementWithoutId = createTextElementWithoutId({
-                canvasForMeasure: canvasForMeasureRef.current,
-                content: moveData.content,
-                isWriting: false,
-                x1: sceneX - moveData.pointerOffsetX1,
-                y1: sceneY - moveData.pointerOffsetY1,
-              })
-              replacedMultiElements.push({ ...newElementWithoutId, id: movingElementId })
-              // continue forEach loop
-              return
-            } else {
-              throw new Error(
-                '1. Mismatch between moving element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for moving'
-              )
-            }
+          // all moving elements(new elements), will be used to replace the current snapshot
+          let replacedMultiElements: TElementData[] = createMovedElements({
+            moveDataArray: prevState.data,
+            getOriginalElementFromId: getElementInCurrentSnapshot,
+            canvasForMeasureTextRef: canvasForMeasureRef,
+            newPointerSceneX: sceneX,
+            newPointerSceneY: sceneY,
           })
-
+          // side effect
           replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
+          // move to the next state of the state machine
           dispatch({ type: 'continueMove', data: [...prevState.data] })
           return
         }
@@ -666,9 +601,47 @@ export function useSelectionMachine({
           )
       }
     },
+    duplicateSelectedSingleElements: ({ originalElementId }: { originalElementId: number }) => {
+      // Steps:
+      // 1. Get a selected element(i.e. original element which will be duplicated)
+      const originalElement = getElementInCurrentSnapshot(originalElementId)
+      if (!originalElement) {
+        throw new Error('Cannot get an original element to duplicate(its id is not found)')
+      }
+      // 2. Create a duplicated element which is moved a bit from the original element
+      // Simulate "move" feature
+      const moveDistanceSceneY = 50
+      const moveDataArray = createMoveDataArray({
+        targetElements: [originalElement],
+        pointerX: 0,
+        pointerY: 0,
+      })
+      const newDuplicatedElements = createMovedElements({
+        moveDataArray: moveDataArray,
+        getOriginalElementFromId: (id) => originalElement,
+        canvasForMeasureTextRef: canvasForMeasureRef,
+        newPointerSceneX: 0,
+        newPointerSceneY: moveDistanceSceneY,
+      })
+      // 3. (Side effect) Commit the duplicated element to snapshot in addElements mode
+      // The duplicated element will also get a new id
+      const newIds = commitNewSnapshot({
+        mode: 'addElements',
+        newElementWithoutIds: newDuplicatedElements,
+      })
+      // 4. Move to the next state of the state machine (it's the same state as the previous state in this case)
+      if (newIds === undefined || newIds[0] == null) {
+        throw new Error('ID of a new duplicated element is missing')
+      }
+      // We switch to select the new duplicated element, instead of the original element
+      dispatch({ type: 'duplicateSelectedSingleElements', data: { elementId: newIds[0] } })
+    },
+    duplicateSelectedMultipleElements: () => {
+      // TODO: Implement this
+    },
   } as const
 
-  return { uiState, actions }
+  return { uiState, actionWithSideEffect }
 }
 
 function getAllElementIdsInsideRectSelector({
@@ -847,4 +820,103 @@ function createResizeData({
     default:
       throw new Error('Unsupported resizing element type')
   }
+}
+
+function createMovedElements({
+  moveDataArray,
+  getOriginalElementFromId,
+  canvasForMeasureTextRef,
+  newPointerSceneX,
+  newPointerSceneY,
+}: {
+  moveDataArray: TMoveData[]
+  getOriginalElementFromId: (elementId: number) => TElementData | undefined
+  canvasForMeasureTextRef: React.MutableRefObject<HTMLCanvasElement | null>
+  newPointerSceneX: number
+  newPointerSceneY: number
+}) {
+  // store all moved elements (i.e. new elements which are the result of moving)
+  let newMovedElements: TElementData[] = []
+
+  // create new moved element, one-by-one
+  moveDataArray.forEach((moveData) => {
+    const movingElementId = moveData.elementId
+
+    const elementBeforeMove = getOriginalElementFromId(movingElementId)
+    if (!elementBeforeMove) {
+      throw new Error('You are trying to move an non-existing element(cannot find it by its id)')
+    }
+    if (
+      (moveData.elementType === 'line' && elementBeforeMove.type === 'line') ||
+      (moveData.elementType === 'arrow' && elementBeforeMove.type === 'arrow')
+    ) {
+      const newX1 = newPointerSceneX - moveData.pointerOffsetX1
+      const newY1 = newPointerSceneY - moveData.pointerOffsetY1
+      // keep existing line width
+      const distanceX = elementBeforeMove.x2 - elementBeforeMove.x1
+      const distanceY = elementBeforeMove.y2 - elementBeforeMove.y1
+      const newElementWithoutId = createLinearElementWithoutId({
+        lineType: elementBeforeMove.type,
+        x1: newX1,
+        y1: newY1,
+        x2: newX1 + distanceX,
+        y2: newY1 + distanceY,
+      })
+      newMovedElements.push({ ...newElementWithoutId, id: movingElementId })
+      // continue forEach loop
+      return
+    } else if (moveData.elementType === 'rectangle' && elementBeforeMove.type === 'rectangle') {
+      const newX1 = newPointerSceneX - moveData.pointerOffsetX1
+      const newY1 = newPointerSceneY - moveData.pointerOffsetY1
+      const newElementWithoutId = moveRectangleElement({
+        newX1: newX1,
+        newY1: newY1,
+        rectElementToMove: elementBeforeMove,
+      })
+      newMovedElements.push({ ...newElementWithoutId, id: movingElementId })
+      // continue forEach loop
+      return
+    } else if (moveData.elementType === 'image' && elementBeforeMove.type === 'image') {
+      const newX1 = newPointerSceneX - moveData.pointerOffsetX1
+      const newY1 = newPointerSceneY - moveData.pointerOffsetY1
+      const newElementWithoutId = moveImageElement({
+        newX1: newX1,
+        newY1: newY1,
+        imageElementToMove: elementBeforeMove,
+      })
+      newMovedElements.push({ ...newElementWithoutId, id: movingElementId })
+      // continue forEach loop
+      return
+    } else if (moveData.elementType === 'pencil' && elementBeforeMove.type === 'pencil') {
+      const newPoints = moveData.pointerOffsetFromPoints.map(({ offsetX, offsetY }) => ({
+        x: newPointerSceneX - offsetX,
+        y: newPointerSceneY - offsetY,
+      }))
+      const newElement: TElementData = {
+        id: movingElementId,
+        type: 'pencil',
+        points: newPoints,
+      }
+      newMovedElements.push(newElement)
+      // continue forEach loop
+      return
+    } else if (moveData.elementType === 'text' && elementBeforeMove.type === 'text') {
+      const newElementWithoutId = createTextElementWithoutId({
+        canvasForMeasure: canvasForMeasureTextRef.current,
+        content: moveData.content,
+        isWriting: false,
+        x1: newPointerSceneX - moveData.pointerOffsetX1,
+        y1: newPointerSceneY - moveData.pointerOffsetY1,
+      })
+      newMovedElements.push({ ...newElementWithoutId, id: movingElementId })
+      // continue forEach loop
+      return
+    } else {
+      throw new Error(
+        '1. Mismatch between moving element type and actual element type\n-or-\n2. Unsupported element type for moving'
+      )
+    }
+  })
+
+  return newMovedElements
 }

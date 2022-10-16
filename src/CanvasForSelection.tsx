@@ -95,7 +95,7 @@ export function CanvasForSelection({
   }) => void
 }) {
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
-  const { uiState, actions } = useSelectionMachine({
+  const { uiState, actionWithSideEffect } = useSelectionMachine({
     currentSnapshot,
     getElementInCurrentSnapshot,
     commitNewSnapshot,
@@ -296,24 +296,24 @@ export function CanvasForSelection({
         selectedElementIds.length !== selectedElementsInSnapshot.length
 
       if (hasUnmatchElementInSnapshot) {
-        const reset = actions.reset
+        const reset = actionWithSideEffect.reset
         reset()
       }
     }
-  }, [uiState, currentSnapshot, actions.reset])
+  }, [uiState, currentSnapshot, actionWithSideEffect.reset])
 
   const [cursorType, setCursorType] = useState<TCursorType>('default')
 
   const { handlePointerDown, handlePointerMove, handlePointerUp } = createPointerHandlers({
     uiState,
-    actions,
+    actionWithSideEffect,
     currentSnapshot,
     viewportCoordsToSceneCoords,
     setCursorType,
   })
 
   function handleClickDeleteElement() {
-    actions.removeSelectedElements({ prevState: uiState })
+    actionWithSideEffect.removeSelectedElements({ prevState: uiState })
   }
 
   return (
@@ -331,7 +331,19 @@ export function CanvasForSelection({
       {/* floating delete button at top-left of the screen */}
       {uiState.state === 'singleElementSelected' || uiState.state === 'multiElementSelected' ? (
         <div style={{ position: 'fixed', top: '45vh', left: '0.5rem' }}>
-          <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />
+          <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />{' '}
+          {uiState.state === 'singleElementSelected' && (
+            <button
+              type="button"
+              onClick={() => {
+                actionWithSideEffect.duplicateSelectedSingleElements({
+                  originalElementId: uiState.data.elementId,
+                })
+              }}
+            >
+              Dup
+            </button>
+          )}
         </div>
       ) : null}
 
