@@ -1,9 +1,15 @@
 import { useCallback, useReducer } from 'react'
-import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam, TSnapshot } from '../App'
 import { createLinearElementWithoutId } from '../CanvasForLinear'
 import { adjustRectangleCoordinates, createRectangleElementWithoutId } from '../CanvasForRect'
-import { getElementsInSnapshot } from '../CanvasForSelection'
 import { createTextElementWithoutId } from '../CanvasForText'
+import {
+  getSingleElementInSnapshot,
+  getMultiElementsInSnapshot,
+  TCommitNewSnapshotFn,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from '../snapshotManipulation'
 import { moveImageElement, moveRectangleElement } from './moveHelpers'
 import { resizeImageElement, resizeRectangleElement } from './resizeHelpers'
 
@@ -250,13 +256,11 @@ function reducer(prevState: TUiState, action: TAction): TUiState {
 
 export function useSelectionMachine({
   currentSnapshot,
-  getElementInCurrentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   canvasForMeasureRef,
 }: {
   currentSnapshot: TSnapshot
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
@@ -388,7 +392,10 @@ export function useSelectionMachine({
       switch (prevState.state) {
         case 'resizing': {
           const resizingElementId = prevState.data.elementId
-          const resizingElement = getElementInCurrentSnapshot(resizingElementId)
+          const resizingElement = getSingleElementInSnapshot({
+            snapshot: currentSnapshot,
+            elementId: resizingElementId,
+          })
           if (!resizingElement || resizingElement.type !== 'rectangle') {
             throw new Error('The resizing element is not a "rectangle" element')
           }
@@ -443,7 +450,8 @@ export function useSelectionMachine({
           // all moving elements(new elements), will be used to replace the current snapshot
           let replacedMultiElements: TElementData[] = createMovedElements({
             moveDataArray: prevState.data,
-            getOriginalElementFromId: getElementInCurrentSnapshot,
+            getOriginalElementFromId: (id) =>
+              getSingleElementInSnapshot({ snapshot: currentSnapshot, elementId: id }),
             canvasForMeasureTextRef: canvasForMeasureRef,
             newPointerSceneX: sceneX,
             newPointerSceneY: sceneY,
@@ -482,7 +490,10 @@ export function useSelectionMachine({
           // replace this specific element
           const resizingElementId = prevState.data.elementId
 
-          const resizingElement = getElementInCurrentSnapshot(resizingElementId)
+          const resizingElement = getSingleElementInSnapshot({
+            snapshot: currentSnapshot,
+            elementId: resizingElementId,
+          })
           if (!resizingElement) {
             throw new Error(
               'You are trying to resize an non-exist element in the current snapshot!!'
@@ -605,7 +616,10 @@ export function useSelectionMachine({
     duplicateSelectedSingleElements: ({ originalElementId }: { originalElementId: number }) => {
       // Steps:
       // 1. Get a selected element(i.e. original element which will be duplicated)
-      const originalElement = getElementInCurrentSnapshot(originalElementId)
+      const originalElement = getSingleElementInSnapshot({
+        snapshot: currentSnapshot,
+        elementId: originalElementId,
+      })
       if (!originalElement) {
         throw new Error('Cannot get an original element to duplicate(its id is not found)')
       }
@@ -643,7 +657,10 @@ export function useSelectionMachine({
       originalElementIds: number[]
     }) => {
       // Steps are similar to `duplicateSelectedSingleElements`. Read its comments for explanation.
-      const originalElements = getElementsInSnapshot(currentSnapshot, originalElementIds)
+      const originalElements = getMultiElementsInSnapshot({
+        snapshot: currentSnapshot,
+        elementIds: originalElementIds,
+      })
       const moveDistanceSceneY = 50
       const moveDataArray = createMoveDataArray({
         targetElements: originalElements,

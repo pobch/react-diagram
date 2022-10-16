@@ -1,5 +1,11 @@
 import { useState } from 'react'
-import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam } from './App'
+import {
+  getSingleElementInSnapshot,
+  TCommitNewSnapshotFn,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './snapshotManipulation'
 
 function createPencilElementWithoutId({
   newX,
@@ -34,7 +40,7 @@ function updatePencilElement({
 
 export function CanvasForPencil({
   renderCanvas,
-  getElementInCurrentSnapshot,
+  currentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
@@ -44,7 +50,7 @@ export function CanvasForPencil({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  currentSnapshot: TSnapshot
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
@@ -94,7 +100,10 @@ export function CanvasForPencil({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
+      const drawingElement = getSingleElementInSnapshot({
+        snapshot: currentSnapshot,
+        elementId: uiState.data.elementId,
+      })
       if (!drawingElement || drawingElement.type !== 'pencil') {
         throw new Error(
           'The drawing element in the current snapshot is missing or not a "pencil" element'

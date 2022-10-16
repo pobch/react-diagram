@@ -2,7 +2,13 @@ import * as React from 'react'
 import { useState } from 'react'
 import { flushSync } from 'react-dom'
 import rough from 'roughjs/bundled/rough.esm'
-import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam } from './App'
+import {
+  getSingleElementInSnapshot,
+  TCommitNewSnapshotFn,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './snapshotManipulation'
 import { CONFIG } from './config'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
@@ -97,7 +103,7 @@ export function createLinearElementWithoutId({
  */
 export function CanvasForLinear({
   renderCanvas,
-  getElementInCurrentSnapshot,
+  currentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
@@ -108,7 +114,7 @@ export function CanvasForLinear({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  currentSnapshot: TSnapshot
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
@@ -178,7 +184,10 @@ export function CanvasForLinear({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
+      const drawingElement = getSingleElementInSnapshot({
+        snapshot: currentSnapshot,
+        elementId: uiState.data.elementId,
+      })
       if (!drawingElement || drawingElement.type !== lineType) {
         throw new Error(
           `The drawing element in the current snapshot is missing or not a "${lineType}" element`

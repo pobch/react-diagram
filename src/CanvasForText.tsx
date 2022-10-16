@@ -1,5 +1,11 @@
 import { useRef, useState } from 'react'
-import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam, TSnapshot } from './App'
+import {
+  getSingleElementInSnapshot,
+  TCommitNewSnapshotFn,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './snapshotManipulation'
 import { CmdButton } from './CmdButton'
 
 export function getTextElementAtPosition({
@@ -78,7 +84,6 @@ export function createTextElementWithoutId({
 export function CanvasForText({
   renderCanvas,
   currentSnapshot,
-  getElementInCurrentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   replaceCurrentSnapshotByRemovingElement,
@@ -92,7 +97,6 @@ export function CanvasForText({
     styleCursor: 'default' | 'text'
   }) => React.ReactElement
   currentSnapshot: TSnapshot
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   replaceCurrentSnapshotByRemovingElement: (elementId: number) => void
@@ -398,7 +402,10 @@ export function CanvasForText({
                   onBlur={() => {
                     // keep state untouched, just make sure `isWriting` is always `true` after blur
                     if (uiState.state === 'updating') {
-                      const editingElement = getElementInCurrentSnapshot(uiState.data.elementId)
+                      const editingElement = getSingleElementInSnapshot({
+                        snapshot: currentSnapshot,
+                        elementId: uiState.data.elementId,
+                      })
                       if (!editingElement || editingElement.type !== 'text') {
                         throw new Error(
                           'The editing element is missing in the current history or not a "text" element'

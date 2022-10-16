@@ -1,12 +1,12 @@
 import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import * as React from 'react'
 import {
-  getSvgPathFromStroke,
+  getMultiElementsInSnapshot,
   TCommitNewSnapshotFn,
   TElementData,
   TReplaceCurrentSnapshotParam,
   TSnapshot,
-} from './App'
+} from './snapshotManipulation'
 import rough from 'roughjs/bundled/rough.esm'
 import getStroke from 'perfect-freehand'
 import { CmdButton } from './CmdButton'
@@ -17,6 +17,7 @@ import {
   TUiState,
   useSelectionMachine,
 } from './selectionToolHelpers/useSelectionMachine'
+import { getSvgPathFromStroke } from './App'
 
 // * -------------------------- Helpers --------------------------
 
@@ -42,20 +43,6 @@ function getSelectedElementIdsFromState(uiState: TUiState) {
   return elementIds
 }
 
-export function getElementsInSnapshot(
-  elementsSnapshot: TSnapshot,
-  elementIds: number[]
-): TElementData[] {
-  const elementIdsMap = elementIds.reduce((prev, elementId) => {
-    prev[elementId] = true
-    return prev
-  }, {} as { [elementId: number]: boolean })
-  const foundElementsInSnapshot = elementsSnapshot.filter((element) => {
-    return elementIdsMap[element.id]
-  })
-  return foundElementsInSnapshot
-}
-
 export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 
 /**
@@ -66,7 +53,6 @@ export type TCursorType = 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
 export function CanvasForSelection({
   renderCanvas,
   currentSnapshot,
-  getElementInCurrentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
@@ -79,7 +65,6 @@ export function CanvasForSelection({
     styleCursor: 'default' | 'move' | 'nesw-resize' | 'nwse-resize'
   }) => React.ReactElement
   currentSnapshot: TSnapshot
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
@@ -97,7 +82,6 @@ export function CanvasForSelection({
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
   const { uiState, actionWithSideEffect } = useSelectionMachine({
     currentSnapshot,
-    getElementInCurrentSnapshot,
     commitNewSnapshot,
     replaceCurrentSnapshotByReplacingElements,
     canvasForMeasureRef,
@@ -118,7 +102,7 @@ export function CanvasForSelection({
     ) {
       const selectedElementIds = getSelectedElementIdsFromState(uiState)
       let extraElements: (TElementData | TAreaSelectData['rectangleSelector'])[] =
-        getElementsInSnapshot(currentSnapshot, selectedElementIds)
+        getMultiElementsInSnapshot({ snapshot: currentSnapshot, elementIds: selectedElementIds })
 
       // also draw rectangle selector (if exist)
       if (uiState.state === 'areaSelecting') {
@@ -291,7 +275,10 @@ export function CanvasForSelection({
       uiState.state === 'multiElementSelected'
     ) {
       const selectedElementIds = getSelectedElementIdsFromState(uiState)
-      const selectedElementsInSnapshot = getElementsInSnapshot(currentSnapshot, selectedElementIds)
+      const selectedElementsInSnapshot = getMultiElementsInSnapshot({
+        snapshot: currentSnapshot,
+        elementIds: selectedElementIds,
+      })
       let hasUnmatchElementInSnapshot =
         selectedElementIds.length !== selectedElementsInSnapshot.length
 

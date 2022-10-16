@@ -1,4 +1,4 @@
-import { TCommitNewSnapshotFn, TElementData } from './App'
+import { TCommitNewSnapshotFn, TElementData } from './snapshotManipulation'
 import iconSrc from './assets/image.svg'
 
 export function ImageUploadButton({

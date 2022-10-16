@@ -2,8 +2,14 @@ import * as React from 'react'
 import { useState } from 'react'
 import { flushSync } from 'react-dom'
 import rough from 'roughjs/bundled/rough.esm'
-import { TCommitNewSnapshotFn, TElementData, TReplaceCurrentSnapshotParam } from './App'
 import { CONFIG } from './config'
+import {
+  getSingleElementInSnapshot,
+  TCommitNewSnapshotFn,
+  TElementData,
+  TReplaceCurrentSnapshotParam,
+  TSnapshot,
+} from './snapshotManipulation'
 
 const generator = rough.generator({ options: { seed: CONFIG.SEED } })
 
@@ -48,7 +54,7 @@ export function adjustRectangleCoordinates(
  */
 export function CanvasForRect({
   renderCanvas,
-  getElementInCurrentSnapshot,
+  currentSnapshot,
   commitNewSnapshot,
   replaceCurrentSnapshotByReplacingElements,
   viewportCoordsToSceneCoords,
@@ -58,7 +64,7 @@ export function CanvasForRect({
     onPointerMove: (e: React.PointerEvent) => void
     onPointerUp: (e: React.PointerEvent) => void
   }) => React.ReactElement
-  getElementInCurrentSnapshot: (elementId: number) => TElementData | undefined
+  currentSnapshot: TSnapshot
   commitNewSnapshot: TCommitNewSnapshotFn
   replaceCurrentSnapshotByReplacingElements: (arg: TReplaceCurrentSnapshotParam) => void
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
@@ -123,7 +129,10 @@ export function CanvasForRect({
         viewportY: e.clientY,
       })
       // replace the drawing element
-      const drawingElement = getElementInCurrentSnapshot(uiState.data.elementId)
+      const drawingElement = getSingleElementInSnapshot({
+        snapshot: currentSnapshot,
+        elementId: uiState.data.elementId,
+      })
       if (!drawingElement || drawingElement.type !== 'rectangle') {
         throw new Error(
           'The drawing element in the current snapshot is missing or not a "rectangle" element'
@@ -156,7 +165,10 @@ export function CanvasForRect({
     // should come from onPointerMove()
     if (uiState.state === 'drawing') {
       // adjust coord when finish drawing
-      const drawnElement = getElementInCurrentSnapshot(uiState.data.elementId)
+      const drawnElement = getSingleElementInSnapshot({
+        snapshot: currentSnapshot,
+        elementId: uiState.data.elementId,
+      })
       if (!drawnElement || drawnElement.type !== 'rectangle') {
         throw new Error(
           'The finishing drawing element in the current snapshot is missing or not a "rectangle" element'

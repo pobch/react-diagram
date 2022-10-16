@@ -1,8 +1,8 @@
 /* eslint-disable no-extra-label */
 import * as React from 'react'
 import { flushSync } from 'react-dom'
-import { TElementData, TSnapshot } from '../App'
-import { getElementsInSnapshot, TCursorType } from '../CanvasForSelection'
+import { getMultiElementsInSnapshot, TElementData, TSnapshot } from '../snapshotManipulation'
+import { TCursorType } from '../CanvasForSelection'
 import { getTextElementAtPosition } from '../CanvasForText'
 import { TUiState, useSelectionMachine, validAction } from './useSelectionMachine'
 
@@ -633,10 +633,10 @@ export function createPointerHandlers({
           }
 
           // find out if a pointer down hits on one of the current selected elements or not
-          const currentSelectedElements = getElementsInSnapshot(
-            currentSnapshot,
-            uiState.data.elementIds
-          )
+          const currentSelectedElements = getMultiElementsInSnapshot({
+            snapshot: currentSnapshot,
+            elementIds: uiState.data.elementIds,
+          })
           const isPointerHitOneOfSelectedElements = currentSelectedElements.some(
             (selectedElement) => selectedElement.id === hitPoint.foundLastElement.id
           )

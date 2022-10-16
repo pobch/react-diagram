@@ -1,4 +1,4 @@
-import { TElementData } from '../App'
+import { TElementData } from '../snapshotManipulation'
 import { createRectangleElementWithoutId } from '../CanvasForRect'
 import { createImageElementWithoutId } from '../ImageUploadButton'
 
