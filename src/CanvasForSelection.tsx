@@ -331,31 +331,29 @@ export function CanvasForSelection({
       {/* floating delete button at top-left of the screen */}
       {uiState.state === 'singleElementSelected' || uiState.state === 'multiElementSelected' ? (
         <div style={{ position: 'fixed', top: '45vh', left: '0.5rem' }}>
-          <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />{' '}
-          {uiState.state === 'singleElementSelected' && (
-            <button
-              type="button"
-              onClick={() => {
-                actionWithSideEffect.duplicateSelectedSingleElements({
-                  originalElementId: uiState.data.elementId,
-                })
-              }}
-            >
-              Dup
-            </button>
-          )}
-          {uiState.state === 'multiElementSelected' && (
-            <button
-              type="button"
-              onClick={() => {
-                actionWithSideEffect.duplicateSelectedMultipleElements({
-                  originalElementIds: uiState.data.elementIds,
-                })
-              }}
-            >
-              Dup
-            </button>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />{' '}
+            {uiState.state === 'singleElementSelected' && (
+              <CmdButton
+                cmdName="duplicate"
+                onClick={() => {
+                  actionWithSideEffect.duplicateSelectedSingleElements({
+                    originalElementId: uiState.data.elementId,
+                  })
+                }}
+              />
+            )}
+            {uiState.state === 'multiElementSelected' && (
+              <CmdButton
+                cmdName="duplicate"
+                onClick={() => {
+                  actionWithSideEffect.duplicateSelectedMultipleElements({
+                    originalElementIds: uiState.data.elementIds,
+                  })
+                }}
+              />
+            )}
+          </div>
         </div>
       ) : null}
 
