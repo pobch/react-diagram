@@ -254,13 +254,13 @@ function getLastElementAtPosition({
 
 export function createPointerHandlers({
   uiState,
-  actions,
+  actionWithSideEffect,
   currentSnapshot,
   viewportCoordsToSceneCoords,
   setCursorType,
 }: {
   uiState: TUiState
-  actions: ReturnType<typeof useSelectionMachine>['actions']
+  actionWithSideEffect: ReturnType<typeof useSelectionMachine>['actionWithSideEffect']
   currentSnapshot: TSnapshot
   viewportCoordsToSceneCoords: (arg: { viewportX: number; viewportY: number }) => {
     sceneX: number
@@ -318,12 +318,12 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
+            actionWithSideEffect[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
 
           // pointer down hits on an element
-          actions[validAction[uiState.state].prepareMove]({
+          actionWithSideEffect[validAction[uiState.state].prepareMove]({
             sceneX,
             sceneY,
             elementsToMove: [hitPoint.foundLastElement],
@@ -354,7 +354,11 @@ export function createPointerHandlers({
           })
 
           // continue dragging
-          actions[validAction[uiState.state].dragSelect]({ sceneX, sceneY, prevState: uiState })
+          actionWithSideEffect[validAction[uiState.state].dragSelect]({
+            sceneX,
+            sceneY,
+            prevState: uiState,
+          })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -363,16 +367,20 @@ export function createPointerHandlers({
           // should come from onPointerMove() of the previous same state: 'areaSelecting'
 
           if (uiState.data.selectedElementIds.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectMultipleElements]({
+              prevState: uiState,
+            })
             return
           }
           if (uiState.data.selectedElementIds.length === 1) {
-            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectSingleElement]({
+              prevState: uiState,
+            })
             return
           }
           if (uiState.data.selectedElementIds.length === 0) {
             // no element got selected
-            actions[validAction[uiState.state].reset]()
+            actionWithSideEffect[validAction[uiState.state].reset]()
             return
           }
         },
@@ -388,7 +396,7 @@ export function createPointerHandlers({
           // https://github.com/pobch/react-diagram/issues/27
           flushSync(() => {
             // should come from onPointerDown() of 'none' || 'singleElementSelected' || 'multiElementSelected' state
-            actions[validAction[uiState.state].startMove]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].startMove]({ prevState: uiState })
             return
           })
         },
@@ -404,11 +412,15 @@ export function createPointerHandlers({
             throw new Error('Cannot select any element because the moving element id is missing')
           }
           if (uiState.data.length === 1) {
-            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectSingleElement]({
+              prevState: uiState,
+            })
             return
           }
           if (uiState.data.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectMultipleElements]({
+              prevState: uiState,
+            })
             return
           }
         },
@@ -429,7 +441,11 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
 
-          actions[validAction[uiState.state].continueMove]({ prevState: uiState, sceneX, sceneY })
+          actionWithSideEffect[validAction[uiState.state].continueMove]({
+            prevState: uiState,
+            sceneX,
+            sceneY,
+          })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -442,11 +458,15 @@ export function createPointerHandlers({
             )
           }
           if (uiState.data.length === 1) {
-            actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectSingleElement]({
+              prevState: uiState,
+            })
             return
           }
           if (uiState.data.length >= 2) {
-            actions[validAction[uiState.state].selectMultipleElements]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].selectMultipleElements]({
+              prevState: uiState,
+            })
             return
           }
         },
@@ -462,7 +482,7 @@ export function createPointerHandlers({
           // https://github.com/pobch/react-diagram/issues/27
           flushSync(() => {
             // should come from onPointerDown() of 'singleElementSelected' state
-            actions[validAction[uiState.state].startResize]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].startResize]({ prevState: uiState })
             return
           })
         },
@@ -474,7 +494,9 @@ export function createPointerHandlers({
           // This means the selected element is not actually resize.
           // Therefore, don't do anything with history.
 
-          actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
+          actionWithSideEffect[validAction[uiState.state].selectSingleElement]({
+            prevState: uiState,
+          })
           return
         },
       }
@@ -494,7 +516,11 @@ export function createPointerHandlers({
             viewportY: e.clientY,
           })
 
-          actions[validAction[uiState.state].continueResize]({ sceneX, sceneY, prevState: uiState })
+          actionWithSideEffect[validAction[uiState.state].continueResize]({
+            sceneX,
+            sceneY,
+            prevState: uiState,
+          })
           return
         },
         handlePointerUp(e: React.PointerEvent) {
@@ -504,11 +530,15 @@ export function createPointerHandlers({
 
           // adjust coordinates to handle the case when resizing flips the rectangle
           if (uiState.data.elementType === 'rectangle') {
-            actions[validAction[uiState.state].flipThenSelectRectangle]({ prevState: uiState })
+            actionWithSideEffect[validAction[uiState.state].flipThenSelectRectangle]({
+              prevState: uiState,
+            })
             return
           }
 
-          actions[validAction[uiState.state].selectSingleElement]({ prevState: uiState })
+          actionWithSideEffect[validAction[uiState.state].selectSingleElement]({
+            prevState: uiState,
+          })
           return
         },
       }
@@ -531,14 +561,14 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
+            actionWithSideEffect[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
           // pointer down hits a different element than the current selected element
           const isHitOnUnselectedElement = hitPoint.foundLastElement.id !== uiState.data.elementId
           if (isHitOnUnselectedElement) {
             // allow to move only
-            actions[validAction[uiState.state].prepareMove]({
+            actionWithSideEffect[validAction[uiState.state].prepareMove]({
               sceneX,
               sceneY,
               elementsToMove: [hitPoint.foundLastElement],
@@ -550,7 +580,7 @@ export function createPointerHandlers({
           // we allow to either move or resize an element
           // ... so, we need to check which part of the element was clicked
           if (hitPoint.pointerPosition === 'onLine' || hitPoint.pointerPosition === 'inside') {
-            actions[validAction[uiState.state].prepareMove]({
+            actionWithSideEffect[validAction[uiState.state].prepareMove]({
               sceneX,
               sceneY,
               elementsToMove: [hitPoint.foundLastElement],
@@ -563,7 +593,7 @@ export function createPointerHandlers({
             hitPoint.pointerPosition === 'br' ||
             hitPoint.pointerPosition === 'bl'
           ) {
-            actions[validAction[uiState.state].prepareResize]({
+            actionWithSideEffect[validAction[uiState.state].prepareResize]({
               elementToResize: hitPoint.foundLastElement,
               pointerPosition: hitPoint.pointerPosition,
             })
@@ -598,7 +628,7 @@ export function createPointerHandlers({
 
           // pointer down does not hit on any elements
           if (!isHit) {
-            actions[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
+            actionWithSideEffect[validAction[uiState.state].prepareDragSelect]({ sceneX, sceneY })
             return
           }
 
@@ -614,7 +644,7 @@ export function createPointerHandlers({
           // pointer down hits on the current selected elements
           // we allow to move only
           if (isPointerHitOneOfSelectedElements) {
-            actions[validAction[uiState.state].prepareMove]({
+            actionWithSideEffect[validAction[uiState.state].prepareMove]({
               sceneX,
               sceneY,
               elementsToMove: currentSelectedElements,
@@ -624,7 +654,7 @@ export function createPointerHandlers({
           // pointer down hits on a different element than the current selected elements
           // we reset state
           else {
-            actions[validAction[uiState.state].reset]()
+            actionWithSideEffect[validAction[uiState.state].reset]()
             return
           }
         },

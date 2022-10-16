@@ -65,3 +65,16 @@ The following functions are temporary. Mostly use for debugging. In the future, 
 ### Icons
 
 https://phosphoricons.com/
+
+### Naming Confusion
+
+- Most of x, y value are in `scene` coordinate (i.e. canvas coord, not viewport coord). They are inconsistency in naming. For example,
+  ```js
+  // All of these variable names are in `scene` coord
+  let sceneX, x1, pointerX
+  ```
+- However, the `viewport` coordinate is more consistency in naming.
+  ```js
+  // There always be `viewport` keyword in `viewport` coord
+  let viewportX
+  ```
