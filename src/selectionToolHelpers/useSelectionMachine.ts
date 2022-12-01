@@ -61,6 +61,7 @@ type TMultiSelectData = {
   elementIds: number[]
 }
 
+// Terminology: `data` property = "context" in XState
 export type TUiState =
   | {
       state: 'none'
@@ -94,7 +95,7 @@ export type TUiState =
       data: TMultiSelectData
     }
 
-type TAction =
+type TEvent =
   | { type: 'prepareDragSelect'; data: TAreaSelectData }
   | { type: 'dragSelect'; data: TAreaSelectData }
   | { type: 'prepareMove'; data: TMoveData[] }
@@ -111,146 +112,101 @@ type TAction =
   | { type: 'duplicateSelectedSingleElements'; data: TSingleSelectData }
   | { type: 'duplicateSelectedMultipleElements'; data: TMultiSelectData }
 
-type TAllActionNames = TAction['type']
+type TAllEventNames = TEvent['type']
 
-export const validAction = {
+// Structure:
+// {
+//   [prevStateName: string]: {
+//     [validEventName: string]: { eventName: 'validEventName'; nextState: 'nextStateName' }
+//   }
+// }
+export const mapPrevToNextState = {
   none: {
-    prepareMove: 'prepareMove',
-    prepareDragSelect: 'prepareDragSelect',
+    prepareMove: { eventName: 'prepareMove', nextState: 'readyToMove' },
+    prepareDragSelect: { eventName: 'prepareDragSelect', nextState: 'areaSelecting' },
   },
   readyToMove: {
-    startMove: 'startMove',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
+    startMove: { eventName: 'startMove', nextState: 'moving' },
+    selectSingleElement: { eventName: 'selectSingleElement', nextState: 'singleElementSelected' },
+    selectMultipleElements: {
+      eventName: 'selectMultipleElements',
+      nextState: 'multiElementSelected',
+    },
+    reset: { eventName: 'reset', nextState: 'none' },
   },
   moving: {
-    continueMove: 'continueMove',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
+    continueMove: { eventName: 'continueMove', nextState: 'moving' },
+    selectSingleElement: { eventName: 'selectSingleElement', nextState: 'singleElementSelected' },
+    selectMultipleElements: {
+      eventName: 'selectMultipleElements',
+      nextState: 'multiElementSelected',
+    },
+    reset: { eventName: 'reset', nextState: 'none' },
   },
   readyToResize: {
-    startResize: 'startResize',
-    selectSingleElement: 'selectSingleElement',
-    reset: 'reset',
+    startResize: { eventName: 'startResize', nextState: 'resizing' },
+    selectSingleElement: { eventName: 'selectSingleElement', nextState: 'singleElementSelected' },
+    reset: { eventName: 'reset', nextState: 'none' },
   },
   resizing: {
-    continueResize: 'continueResize',
-    selectSingleElement: 'selectSingleElement',
-    flipThenSelectRectangle: 'flipThenSelectRectangle',
-    reset: 'reset',
+    continueResize: { eventName: 'continueResize', nextState: 'resizing' },
+    selectSingleElement: { eventName: 'selectSingleElement', nextState: 'singleElementSelected' },
+    flipThenSelectRectangle: {
+      eventName: 'flipThenSelectRectangle',
+      nextState: 'singleElementSelected',
+    },
+    reset: { eventName: 'reset', nextState: 'none' },
   },
   areaSelecting: {
-    dragSelect: 'dragSelect',
-    selectSingleElement: 'selectSingleElement',
-    selectMultipleElements: 'selectMultipleElements',
-    reset: 'reset',
+    dragSelect: { eventName: 'dragSelect', nextState: 'areaSelecting' },
+    selectSingleElement: { eventName: 'selectSingleElement', nextState: 'singleElementSelected' },
+    selectMultipleElements: {
+      eventName: 'selectMultipleElements',
+      nextState: 'multiElementSelected',
+    },
+    reset: { eventName: 'reset', nextState: 'none' },
   },
   singleElementSelected: {
-    prepareMove: 'prepareMove',
-    prepareResize: 'prepareResize',
-    prepareDragSelect: 'prepareDragSelect',
-    reset: 'reset',
-    removeSelectedElements: 'removeSelectedElements',
-    duplicateSelectedSingleElements: 'duplicateSelectedSingleElements',
+    prepareMove: { eventName: 'prepareMove', nextState: 'readyToMove' },
+    prepareResize: { eventName: 'prepareResize', nextState: 'readyToResize' },
+    prepareDragSelect: { eventName: 'prepareDragSelect', nextState: 'areaSelecting' },
+    reset: { eventName: 'reset', nextState: 'none' },
+    removeSelectedElements: { eventName: 'removeSelectedElements', nextState: 'none' },
+    duplicateSelectedSingleElements: {
+      eventName: 'duplicateSelectedSingleElements',
+      nextState: 'singleElementSelected',
+    },
   },
   multiElementSelected: {
-    prepareMove: 'prepareMove',
-    prepareDragSelect: 'prepareDragSelect',
-    reset: 'reset',
-    removeSelectedElements: 'removeSelectedElements',
-    duplicateSelectedMultipleElements: 'duplicateSelectedMultipleElements',
+    prepareMove: { eventName: 'prepareMove', nextState: 'readyToMove' },
+    prepareDragSelect: { eventName: 'prepareDragSelect', nextState: 'areaSelecting' },
+    reset: { eventName: 'reset', nextState: 'none' },
+    removeSelectedElements: { eventName: 'removeSelectedElements', nextState: 'none' },
+    duplicateSelectedMultipleElements: {
+      eventName: 'duplicateSelectedMultipleElements',
+      nextState: 'multiElementSelected',
+    },
   },
 } as const
 
-const mapActionNameToNextStateName = {
-  prepareDragSelect: 'areaSelecting',
-  dragSelect: 'areaSelecting',
+function reducer(prevState: TUiState, event: TEvent): TUiState {
+  const mapPrevToNextStateWithLooserType: {
+    [PrevStateName in TUiState['state']]: {
+      [EventName in TAllEventNames]?: { eventName: EventName; nextState: TUiState['state'] }
+    }
+  } = mapPrevToNextState
 
-  prepareMove: 'readyToMove',
-  startMove: 'moving',
-  continueMove: 'moving',
-
-  prepareResize: 'readyToResize',
-  startResize: 'resizing',
-  continueResize: 'resizing',
-
-  selectSingleElement: 'singleElementSelected',
-  flipThenSelectRectangle: 'singleElementSelected',
-  selectMultipleElements: 'multiElementSelected',
-
-  reset: 'none',
-
-  removeSelectedElements: 'none',
-
-  duplicateSelectedSingleElements: 'singleElementSelected',
-  duplicateSelectedMultipleElements: 'multiElementSelected',
-} as const
-
-function reducer(prevState: TUiState, action: TAction): TUiState {
-  const validActionWithLooserType: {
-    [CurrentStateName in TUiState['state']]: { [ActionName in TAllActionNames]?: ActionName }
-  } = validAction
-
-  const isActionValid = validActionWithLooserType[prevState.state][action.type]
-  if (!isActionValid) {
+  const nextStateName = mapPrevToNextStateWithLooserType[prevState.state][event.type]?.nextState
+  if (nextStateName == null) {
     throw new Error(
-      `Changing state from "${prevState.state}" by action "${action.type}" is not allowed.`
+      `Changing state from "${prevState.state}" by event "${event.type}" is not allowed.`
     )
   }
 
-  switch (action.type) {
-    case 'prepareDragSelect':
-    case 'dragSelect': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'prepareMove': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'startMove':
-    case 'continueMove': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'prepareResize': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'startResize':
-    case 'continueResize': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'selectSingleElement':
-    case 'flipThenSelectRectangle': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'selectMultipleElements': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'reset':
-    case 'removeSelectedElements': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName }
-    }
-    case 'duplicateSelectedSingleElements': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    case 'duplicateSelectedMultipleElements': {
-      const nextStateName = mapActionNameToNextStateName[action.type]
-      return { state: nextStateName, data: action.data }
-    }
-    default: {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const remainingActionType: never = action
-      throw new Error('Unsupported action type inside the reducer')
-    }
+  if ('data' in event) {
+    return { state: nextStateName, data: event.data } as TUiState
+  } else {
+    return { state: nextStateName } as TUiState
   }
 }
 
@@ -266,427 +222,563 @@ export function useSelectionMachine({
   canvasForMeasureRef: React.MutableRefObject<HTMLCanvasElement | null>
 }) {
   const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
-  const actionWithSideEffect = {
-    prepareDragSelect: ({ sceneX, sceneY }: { sceneX: number; sceneY: number }) => {
-      dispatch({
-        type: 'prepareDragSelect',
-        data: {
-          rectangleSelector: {
-            type: 'rectangleSelector',
-            x1: sceneX,
-            y1: sceneY,
-            x2: sceneX,
-            y2: sceneY,
-          },
-          selectedElementIds: [],
+
+  // actions which have the same implementation no matter what prevState & eventName are
+
+  function actionOfPrepareMoveEvent({
+    sceneX,
+    sceneY,
+    elementsToMove,
+  }: {
+    sceneX: number
+    sceneY: number
+    elementsToMove: TElementData[]
+  }) {
+    dispatch({
+      type: 'prepareMove',
+      data: createMoveDataArray({
+        targetElements: elementsToMove,
+        pointerX: sceneX,
+        pointerY: sceneY,
+      }),
+    })
+  }
+
+  function actionOfPrepareDragSelectEvent({ sceneX, sceneY }: { sceneX: number; sceneY: number }) {
+    dispatch({
+      type: 'prepareDragSelect',
+      data: {
+        rectangleSelector: {
+          type: 'rectangleSelector',
+          x1: sceneX,
+          y1: sceneY,
+          x2: sceneX,
+          y2: sceneY,
         },
-      })
-    },
-    dragSelect: ({
-      sceneX,
-      sceneY,
-      prevState,
-    }: {
-      sceneX: number
-      sceneY: number
-      prevState: TUiState
-    }) => {
-      switch (prevState.state) {
-        case 'areaSelecting':
-          dispatch({
-            type: 'dragSelect',
-            data: {
-              rectangleSelector: {
-                type: 'rectangleSelector',
-                x1: prevState.data.rectangleSelector.x1,
-                y1: prevState.data.rectangleSelector.y1,
-                x2: sceneX,
-                y2: sceneY,
-              },
-              selectedElementIds: getAllElementIdsInsideRectSelector({
-                elementsSnapshot: currentSnapshot,
-                rectSelectorX1: prevState.data.rectangleSelector.x1,
-                rectSelectorY1: prevState.data.rectangleSelector.y1,
-                rectSelectorX2: sceneX,
-                rectSelectorY2: sceneY,
-              }),
-            },
-          })
-          return
-        default:
-          throw new Error(`dragSelect action is not implemented for ${prevState.state} state`)
-      }
-    },
-    prepareMove: ({
-      sceneX,
-      sceneY,
-      elementsToMove,
-    }: {
-      sceneX: number
-      sceneY: number
-      elementsToMove: TElementData[]
-    }) => {
-      dispatch({
-        type: 'prepareMove',
-        data: createMoveDataArray({
-          targetElements: elementsToMove,
-          pointerX: sceneX,
-          pointerY: sceneY,
-        }),
-      })
-    },
-    selectMultipleElements: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'areaSelecting':
-          dispatch({
-            type: 'selectMultipleElements',
-            data: {
-              elementIds: prevState.data.selectedElementIds,
-            },
-          })
-          return
-        case 'readyToMove':
-        case 'moving':
-          dispatch({
-            type: 'selectMultipleElements',
-            data: { elementIds: prevState.data.map((moveData) => moveData.elementId) },
-          })
-          return
-        default:
-          throw new Error(
-            `selectMultipleElements action is not implemented for ${prevState.state} state`
-          )
-      }
-    },
-    selectSingleElement: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'areaSelecting':
-          dispatch({
-            type: 'selectSingleElement',
-            data: {
-              elementId: prevState.data.selectedElementIds[0]!,
-            },
-          })
-          return
-        case 'readyToMove':
-        case 'moving':
-          dispatch({
-            type: 'selectSingleElement',
-            data: { elementId: prevState.data[0]!.elementId },
-          })
-          return
-        case 'readyToResize':
-        case 'resizing':
-          dispatch({
-            type: 'selectSingleElement',
-            data: { elementId: prevState.data.elementId },
-          })
-          return
-        default:
-          throw new Error(
-            `selectSingleElement action is not implemented for ${prevState.state} state`
-          )
-      }
-    },
-    flipThenSelectRectangle: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'resizing': {
-          const resizingElementId = prevState.data.elementId
-          const resizingElement = getSingleElementInSnapshot({
-            snapshot: currentSnapshot,
-            elementId: resizingElementId,
-          })
-          if (!resizingElement || resizingElement.type !== 'rectangle') {
-            throw new Error('The resizing element is not a "rectangle" element')
-          }
-          const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(resizingElement)
-          const newElementWithoutId = createRectangleElementWithoutId({
-            x1: newX1,
-            y1: newY1,
-            width: newX2 - newX1,
-            height: newY2 - newY1,
-          })
-          replaceCurrentSnapshotByReplacingElements({
-            replacedElement: { ...newElementWithoutId, id: resizingElementId },
-          })
-          dispatch({
-            type: 'flipThenSelectRectangle',
-            data: { elementId: resizingElementId },
-          })
-          return
-        }
-        default:
-          throw new Error(
-            `flipThenSelectRectangle action is not implemented for ${prevState.state} state`
-          )
-      }
-    },
-    reset: useCallback(() => {
-      dispatch({
-        type: 'reset',
-      })
-    }, []),
-    startMove: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'readyToMove':
-          commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: 'startMove', data: [...prevState.data] })
-          return
-        default:
-          throw new Error(`startMove action is not implemented for ${prevState.state} state`)
-      }
-    },
-    continueMove: ({
-      sceneX,
-      sceneY,
-      prevState,
-    }: {
-      sceneX: number
-      sceneY: number
-      prevState: TUiState
-    }) => {
-      switch (prevState.state) {
-        case 'moving': {
-          // all moving elements(new elements), will be used to replace the current snapshot
-          let replacedMultiElements: TElementData[] = createMovedElements({
-            moveDataArray: prevState.data,
-            getOriginalElementFromId: (id) =>
-              getSingleElementInSnapshot({ snapshot: currentSnapshot, elementId: id }),
-            canvasForMeasureTextRef: canvasForMeasureRef,
-            newPointerSceneX: sceneX,
-            newPointerSceneY: sceneY,
-          })
-          // side effect
-          replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
-          // move to the next state of the state machine
-          dispatch({ type: 'continueMove', data: [...prevState.data] })
-          return
-        }
-        default:
-          throw new Error(`continueMove action is not implemented for ${prevState.state} state`)
-      }
-    },
-    startResize: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'readyToResize':
-          commitNewSnapshot({ mode: 'clone' })
-          dispatch({ type: 'startResize', data: { ...prevState.data } })
-          return
-        default:
-          throw new Error(`startResize action is not implemented for ${prevState.state} state`)
-      }
-    },
-    continueResize: ({
-      sceneX,
-      sceneY,
-      prevState,
-    }: {
-      sceneX: number
-      sceneY: number
-      prevState: TUiState
-    }) => {
-      switch (prevState.state) {
-        case 'resizing': {
-          // replace this specific element
-          const resizingElementId = prevState.data.elementId
+        selectedElementIds: [],
+      },
+    })
+  }
 
-          const resizingElement = getSingleElementInSnapshot({
-            snapshot: currentSnapshot,
-            elementId: resizingElementId,
-          })
-          if (!resizingElement) {
+  // need useCallback() because it will be used in useEffect()
+  const actionOfResetEvent = useCallback(() => {
+    dispatch({
+      type: 'reset',
+    })
+  }, [])
+
+  // each action should be tied to each prevState & event combo
+  // { [prevStateName: string]: { [validEventName: string]: ActionFunction } }
+  const actions = {
+    none: {
+      [mapPrevToNextState.none.prepareMove.eventName]: actionOfPrepareMoveEvent,
+      [mapPrevToNextState.none.prepareDragSelect.eventName]: actionOfPrepareDragSelectEvent,
+    },
+    readyToMove: {
+      [mapPrevToNextState.readyToMove.startMove.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'readyToMove':
+            commitNewSnapshot({ mode: 'clone' })
+            dispatch({ type: 'startMove', data: [...prevState.data] })
+            return
+          default:
             throw new Error(
-              'You are trying to resize an non-exist element in the current snapshot!!'
+              `For previous ${prevState.state} state -> startMove event, there is no action implemented.`
             )
+        }
+      },
+      [mapPrevToNextState.readyToMove.selectSingleElement.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'readyToMove':
+            dispatch({
+              type: 'selectSingleElement',
+              data: { elementId: prevState.data[0]!.elementId },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectSingleElement event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.readyToMove.selectMultipleElements.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'readyToMove':
+            dispatch({
+              type: 'selectMultipleElements',
+              data: { elementIds: prevState.data.map((moveData) => moveData.elementId) },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectMultipleElements event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.readyToMove.reset.eventName]: actionOfResetEvent,
+    },
+    moving: {
+      [mapPrevToNextState.moving.continueMove.eventName]: ({
+        sceneX,
+        sceneY,
+      }: {
+        sceneX: number
+        sceneY: number
+      }) => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'moving': {
+            // all moving elements(new elements), will be used to replace the current snapshot
+            let replacedMultiElements: TElementData[] = createMovedElements({
+              moveDataArray: prevState.data,
+              getOriginalElementFromId: (id) =>
+                getSingleElementInSnapshot({ snapshot: currentSnapshot, elementId: id }),
+              canvasForMeasureTextRef: canvasForMeasureRef,
+              newPointerSceneX: sceneX,
+              newPointerSceneY: sceneY,
+            })
+            // side effect
+            replaceCurrentSnapshotByReplacingElements({ replacedMultiElements })
+            // move to the next state of the state machine
+            dispatch({ type: 'continueMove', data: [...prevState.data] })
+            return
           }
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> continueMove event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.moving.selectSingleElement.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'moving':
+            dispatch({
+              type: 'selectSingleElement',
+              data: { elementId: prevState.data[0]!.elementId },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectSingleElement event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.moving.selectMultipleElements.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'moving':
+            dispatch({
+              type: 'selectMultipleElements',
+              data: { elementIds: prevState.data.map((moveData) => moveData.elementId) },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectMultipleElements event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.moving.reset.eventName]: actionOfResetEvent,
+    },
+    readyToResize: {
+      [mapPrevToNextState.readyToResize.startResize.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'readyToResize':
+            commitNewSnapshot({ mode: 'clone' })
+            dispatch({ type: 'startResize', data: { ...prevState.data } })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> startResize event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.readyToResize.selectSingleElement.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'readyToResize':
+            dispatch({
+              type: 'selectSingleElement',
+              data: { elementId: prevState.data.elementId },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectSingleElement event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.readyToResize.reset.eventName]: actionOfResetEvent,
+    },
+    resizing: {
+      [mapPrevToNextState.resizing.continueResize.eventName]: ({
+        sceneX,
+        sceneY,
+      }: {
+        sceneX: number
+        sceneY: number
+      }) => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'resizing': {
+            // replace this specific element
+            const resizingElementId = prevState.data.elementId
 
-          if (
-            (prevState.data.elementType === 'line' && resizingElement.type === 'line') ||
-            (prevState.data.elementType === 'arrow' && resizingElement.type === 'arrow')
-          ) {
-            if (prevState.data.pointerPosition === 'start') {
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: resizingElement.type,
-                x1: sceneX,
-                y1: sceneY,
-                x2: resizingElement.x2,
-                y2: resizingElement.y2,
-              })
-              replaceCurrentSnapshotByReplacingElements({
-                replacedElement: { ...newElementWithoutId, id: resizingElementId },
-              })
-              dispatch({
-                type: 'continueResize',
-                data: { ...prevState.data },
-              })
-              return
-            } else if (prevState.data.pointerPosition === 'end') {
-              const newElementWithoutId = createLinearElementWithoutId({
-                lineType: resizingElement.type,
-                x1: resizingElement.x1,
-                y1: resizingElement.y1,
-                x2: sceneX,
-                y2: sceneY,
-              })
-              replaceCurrentSnapshotByReplacingElements({
-                replacedElement: { ...newElementWithoutId, id: resizingElementId },
-              })
-              dispatch({
-                type: 'continueResize',
-                data: { ...prevState.data },
-              })
-              return
+            const resizingElement = getSingleElementInSnapshot({
+              snapshot: currentSnapshot,
+              elementId: resizingElementId,
+            })
+            if (!resizingElement) {
+              throw new Error(
+                'You are trying to resize an non-exist element in the current snapshot!!'
+              )
             }
-            // should not reach here
-            throw new Error(
-              'While resizing a line or arrow, the pointer position is not at either end of the line.'
-            )
-          } else if (
-            prevState.data.elementType === 'rectangle' &&
-            resizingElement.type === 'rectangle'
-          ) {
-            const newElementWithoutId = resizeRectangleElement({
-              newPointerPosition: { x: sceneX, y: sceneY },
-              pointerStartedAt: prevState.data.pointerPosition,
-              rectElementToResize: resizingElement,
-            })
-            replaceCurrentSnapshotByReplacingElements({
-              replacedElement: { ...newElementWithoutId, id: resizingElementId },
-            })
-            dispatch({
-              type: 'continueResize',
-              data: { ...prevState.data },
-            })
-            return
-          } else if (prevState.data.elementType === 'image' && resizingElement.type === 'image') {
-            const newElementWithoutId = resizeImageElement({
-              newPointerPosition: { x: sceneX, y: sceneY },
-              pointerStartedAt: prevState.data.pointerPosition,
-              imageElementToResize: resizingElement,
-            })
-            replaceCurrentSnapshotByReplacingElements({
-              replacedElement: { ...newElementWithoutId, id: resizingElementId },
-            })
-            dispatch({
-              type: 'continueResize',
-              data: { ...prevState.data },
-            })
-            return
-          } else {
-            throw new Error(
-              '1. Mismatch between resizing element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for resizing'
-            )
+
+            if (
+              (prevState.data.elementType === 'line' && resizingElement.type === 'line') ||
+              (prevState.data.elementType === 'arrow' && resizingElement.type === 'arrow')
+            ) {
+              if (prevState.data.pointerPosition === 'start') {
+                const newElementWithoutId = createLinearElementWithoutId({
+                  lineType: resizingElement.type,
+                  x1: sceneX,
+                  y1: sceneY,
+                  x2: resizingElement.x2,
+                  y2: resizingElement.y2,
+                })
+                replaceCurrentSnapshotByReplacingElements({
+                  replacedElement: { ...newElementWithoutId, id: resizingElementId },
+                })
+                dispatch({
+                  type: 'continueResize',
+                  data: { ...prevState.data },
+                })
+                return
+              } else if (prevState.data.pointerPosition === 'end') {
+                const newElementWithoutId = createLinearElementWithoutId({
+                  lineType: resizingElement.type,
+                  x1: resizingElement.x1,
+                  y1: resizingElement.y1,
+                  x2: sceneX,
+                  y2: sceneY,
+                })
+                replaceCurrentSnapshotByReplacingElements({
+                  replacedElement: { ...newElementWithoutId, id: resizingElementId },
+                })
+                dispatch({
+                  type: 'continueResize',
+                  data: { ...prevState.data },
+                })
+                return
+              }
+              // should not reach here
+              throw new Error(
+                'While resizing a line or arrow, the pointer position is not at either end of the line.'
+              )
+            } else if (
+              prevState.data.elementType === 'rectangle' &&
+              resizingElement.type === 'rectangle'
+            ) {
+              const newElementWithoutId = resizeRectangleElement({
+                newPointerPosition: { x: sceneX, y: sceneY },
+                pointerStartedAt: prevState.data.pointerPosition,
+                rectElementToResize: resizingElement,
+              })
+              replaceCurrentSnapshotByReplacingElements({
+                replacedElement: { ...newElementWithoutId, id: resizingElementId },
+              })
+              dispatch({
+                type: 'continueResize',
+                data: { ...prevState.data },
+              })
+              return
+            } else if (prevState.data.elementType === 'image' && resizingElement.type === 'image') {
+              const newElementWithoutId = resizeImageElement({
+                newPointerPosition: { x: sceneX, y: sceneY },
+                pointerStartedAt: prevState.data.pointerPosition,
+                imageElementToResize: resizingElement,
+              })
+              replaceCurrentSnapshotByReplacingElements({
+                replacedElement: { ...newElementWithoutId, id: resizingElementId },
+              })
+              dispatch({
+                type: 'continueResize',
+                data: { ...prevState.data },
+              })
+              return
+            } else {
+              throw new Error(
+                '1. Mismatch between resizing element type and actual element type in the snapshot\n-or-\n2. Unsupported element type for resizing'
+              )
+            }
           }
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> continueResize event, there is no action implemented.`
+            )
         }
-        default:
-          throw new Error(`continueResize action is not implemented for ${prevState.state} state`)
-      }
+      },
+      [mapPrevToNextState.resizing.selectSingleElement.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'resizing':
+            dispatch({
+              type: 'selectSingleElement',
+              data: { elementId: prevState.data.elementId },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectSingleElement event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.resizing.flipThenSelectRectangle.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'resizing': {
+            const resizingElementId = prevState.data.elementId
+            const resizingElement = getSingleElementInSnapshot({
+              snapshot: currentSnapshot,
+              elementId: resizingElementId,
+            })
+            if (!resizingElement || resizingElement.type !== 'rectangle') {
+              throw new Error('The resizing element is not a "rectangle" element')
+            }
+            const { newX1, newX2, newY1, newY2 } = adjustRectangleCoordinates(resizingElement)
+            const newElementWithoutId = createRectangleElementWithoutId({
+              x1: newX1,
+              y1: newY1,
+              width: newX2 - newX1,
+              height: newY2 - newY1,
+            })
+            replaceCurrentSnapshotByReplacingElements({
+              replacedElement: { ...newElementWithoutId, id: resizingElementId },
+            })
+            dispatch({
+              type: 'flipThenSelectRectangle',
+              data: { elementId: resizingElementId },
+            })
+            return
+          }
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> flipThenSelectRectangle event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.resizing.reset.eventName]: actionOfResetEvent,
     },
-    prepareResize: ({
-      elementToResize,
-      pointerPosition,
-    }: {
-      elementToResize: TElementData
-      pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'br' | 'bl'
-    }) => {
-      dispatch({
-        type: 'prepareResize',
-        data: createResizeData({
-          targetElement: elementToResize,
-          pointerPosition: pointerPosition,
-        }),
-      })
+    areaSelecting: {
+      [mapPrevToNextState.areaSelecting.dragSelect.eventName]: ({
+        sceneX,
+        sceneY,
+      }: {
+        sceneX: number
+        sceneY: number
+      }) => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'areaSelecting':
+            dispatch({
+              type: 'dragSelect',
+              data: {
+                rectangleSelector: {
+                  type: 'rectangleSelector',
+                  x1: prevState.data.rectangleSelector.x1,
+                  y1: prevState.data.rectangleSelector.y1,
+                  x2: sceneX,
+                  y2: sceneY,
+                },
+                selectedElementIds: getAllElementIdsInsideRectSelector({
+                  elementsSnapshot: currentSnapshot,
+                  rectSelectorX1: prevState.data.rectangleSelector.x1,
+                  rectSelectorY1: prevState.data.rectangleSelector.y1,
+                  rectSelectorX2: sceneX,
+                  rectSelectorY2: sceneY,
+                }),
+              },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> dragSelect event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.areaSelecting.selectSingleElement.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'areaSelecting':
+            dispatch({
+              type: 'selectSingleElement',
+              data: {
+                elementId: prevState.data.selectedElementIds[0]!,
+              },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectSingleElement event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.areaSelecting.selectMultipleElements.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'areaSelecting':
+            dispatch({
+              type: 'selectMultipleElements',
+              data: {
+                elementIds: prevState.data.selectedElementIds,
+              },
+            })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> selectMultipleElements event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.areaSelecting.reset.eventName]: actionOfResetEvent,
     },
-    removeSelectedElements: ({ prevState }: { prevState: TUiState }) => {
-      switch (prevState.state) {
-        case 'singleElementSelected':
-          commitNewSnapshot({ mode: 'removeElements', elementIds: [prevState.data.elementId] })
-          dispatch({ type: 'reset' })
-          return
-        case 'multiElementSelected':
-          commitNewSnapshot({ mode: 'removeElements', elementIds: prevState.data.elementIds })
-          dispatch({ type: 'reset' })
-          return
-        default:
-          throw new Error(
-            `removeSelectedElements action is not implemented for ${prevState.state} state`
-          )
-      }
+    singleElementSelected: {
+      [mapPrevToNextState.singleElementSelected.prepareMove.eventName]: actionOfPrepareMoveEvent,
+      [mapPrevToNextState.singleElementSelected.prepareResize.eventName]: ({
+        elementToResize,
+        pointerPosition,
+      }: {
+        elementToResize: TElementData
+        pointerPosition: 'start' | 'end' | 'tl' | 'tr' | 'br' | 'bl'
+      }) => {
+        dispatch({
+          type: 'prepareResize',
+          data: createResizeData({
+            targetElement: elementToResize,
+            pointerPosition: pointerPosition,
+          }),
+        })
+      },
+      [mapPrevToNextState.singleElementSelected.prepareDragSelect.eventName]:
+        actionOfPrepareDragSelectEvent,
+      [mapPrevToNextState.singleElementSelected.reset.eventName]: actionOfResetEvent,
+      [mapPrevToNextState.singleElementSelected.removeSelectedElements.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'singleElementSelected':
+            commitNewSnapshot({ mode: 'removeElements', elementIds: [prevState.data.elementId] })
+            dispatch({ type: 'reset' })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> removeSelectedElements event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.singleElementSelected.duplicateSelectedSingleElements.eventName]: ({
+        originalElementId,
+      }: {
+        originalElementId: number
+      }) => {
+        // Steps:
+        // 1. Get a selected element(i.e. original element which will be duplicated)
+        const originalElement = getSingleElementInSnapshot({
+          snapshot: currentSnapshot,
+          elementId: originalElementId,
+        })
+        if (!originalElement) {
+          throw new Error('Cannot get an original element to duplicate(its id is not found)')
+        }
+        // 2. Create a duplicated element which is moved a bit from the original element
+        // Simulate "move" feature
+        const moveDistanceSceneY = 50
+        const moveDataArray = createMoveDataArray({
+          targetElements: [originalElement],
+          pointerX: 0,
+          pointerY: 0,
+        })
+        const newDuplicatedElements = createMovedElements({
+          moveDataArray: moveDataArray,
+          getOriginalElementFromId: (id) => originalElement,
+          canvasForMeasureTextRef: canvasForMeasureRef,
+          newPointerSceneX: 0,
+          newPointerSceneY: moveDistanceSceneY,
+        })
+        // 3. (Side effect) Commit the duplicated element to snapshot in addElements mode
+        // The duplicated element will also get a new id
+        const newIds = commitNewSnapshot({
+          mode: 'addElements',
+          newElementWithoutIds: newDuplicatedElements,
+        })
+        // 4. Move to the next state of the state machine (it's the same state as the previous state in this case)
+        if (newIds === undefined || newIds[0] == null) {
+          throw new Error('ID of a new duplicated element is missing')
+        }
+        // We switch to select the new duplicated element, instead of the original element
+        dispatch({ type: 'duplicateSelectedSingleElements', data: { elementId: newIds[0] } })
+      },
     },
-    duplicateSelectedSingleElements: ({ originalElementId }: { originalElementId: number }) => {
-      // Steps:
-      // 1. Get a selected element(i.e. original element which will be duplicated)
-      const originalElement = getSingleElementInSnapshot({
-        snapshot: currentSnapshot,
-        elementId: originalElementId,
-      })
-      if (!originalElement) {
-        throw new Error('Cannot get an original element to duplicate(its id is not found)')
-      }
-      // 2. Create a duplicated element which is moved a bit from the original element
-      // Simulate "move" feature
-      const moveDistanceSceneY = 50
-      const moveDataArray = createMoveDataArray({
-        targetElements: [originalElement],
-        pointerX: 0,
-        pointerY: 0,
-      })
-      const newDuplicatedElements = createMovedElements({
-        moveDataArray: moveDataArray,
-        getOriginalElementFromId: (id) => originalElement,
-        canvasForMeasureTextRef: canvasForMeasureRef,
-        newPointerSceneX: 0,
-        newPointerSceneY: moveDistanceSceneY,
-      })
-      // 3. (Side effect) Commit the duplicated element to snapshot in addElements mode
-      // The duplicated element will also get a new id
-      const newIds = commitNewSnapshot({
-        mode: 'addElements',
-        newElementWithoutIds: newDuplicatedElements,
-      })
-      // 4. Move to the next state of the state machine (it's the same state as the previous state in this case)
-      if (newIds === undefined || newIds[0] == null) {
-        throw new Error('ID of a new duplicated element is missing')
-      }
-      // We switch to select the new duplicated element, instead of the original element
-      dispatch({ type: 'duplicateSelectedSingleElements', data: { elementId: newIds[0] } })
-    },
-    duplicateSelectedMultipleElements: ({
-      originalElementIds,
-    }: {
-      originalElementIds: number[]
-    }) => {
-      // Steps are similar to `duplicateSelectedSingleElements`. Read its comments for explanation.
-      const originalElements = getMultiElementsInSnapshot({
-        snapshot: currentSnapshot,
-        elementIds: originalElementIds,
-      })
-      const moveDistanceSceneY = 50
-      const moveDataArray = createMoveDataArray({
-        targetElements: originalElements,
-        pointerX: 0,
-        pointerY: 0,
-      })
-      const newDuplicatedElements = createMovedElements({
-        moveDataArray: moveDataArray,
-        getOriginalElementFromId: (id) => originalElements.find((element) => element.id === id),
-        canvasForMeasureTextRef: canvasForMeasureRef,
-        newPointerSceneX: 0,
-        newPointerSceneY: moveDistanceSceneY,
-      })
-      const newIds = commitNewSnapshot({
-        mode: 'addElements',
-        newElementWithoutIds: newDuplicatedElements,
-      })
-      if (newIds === undefined || newIds.length !== originalElements.length) {
-        throw new Error('Some IDs of new duplicated elements are missing')
-      }
-      // We switch to select the new duplicated elements, instead of the original elements
-      dispatch({ type: 'duplicateSelectedMultipleElements', data: { elementIds: newIds } })
+    multiElementSelected: {
+      [mapPrevToNextState.multiElementSelected.prepareMove.eventName]: actionOfPrepareMoveEvent,
+      [mapPrevToNextState.multiElementSelected.prepareDragSelect.eventName]:
+        actionOfPrepareDragSelectEvent,
+      [mapPrevToNextState.multiElementSelected.reset.eventName]: actionOfResetEvent,
+      [mapPrevToNextState.multiElementSelected.removeSelectedElements.eventName]: () => {
+        const prevState = uiState
+        switch (prevState.state) {
+          case 'multiElementSelected':
+            commitNewSnapshot({ mode: 'removeElements', elementIds: prevState.data.elementIds })
+            dispatch({ type: 'reset' })
+            return
+          default:
+            throw new Error(
+              `For previous ${prevState.state} state -> removeSelectedElements event, there is no action implemented.`
+            )
+        }
+      },
+      [mapPrevToNextState.multiElementSelected.duplicateSelectedMultipleElements.eventName]: ({
+        originalElementIds,
+      }: {
+        originalElementIds: number[]
+      }) => {
+        // Steps are similar to `duplicateSelectedSingleElements`. Read its comments for explanation.
+        const originalElements = getMultiElementsInSnapshot({
+          snapshot: currentSnapshot,
+          elementIds: originalElementIds,
+        })
+        const moveDistanceSceneY = 50
+        const moveDataArray = createMoveDataArray({
+          targetElements: originalElements,
+          pointerX: 0,
+          pointerY: 0,
+        })
+        const newDuplicatedElements = createMovedElements({
+          moveDataArray: moveDataArray,
+          getOriginalElementFromId: (id) => originalElements.find((element) => element.id === id),
+          canvasForMeasureTextRef: canvasForMeasureRef,
+          newPointerSceneX: 0,
+          newPointerSceneY: moveDistanceSceneY,
+        })
+        const newIds = commitNewSnapshot({
+          mode: 'addElements',
+          newElementWithoutIds: newDuplicatedElements,
+        })
+        if (newIds === undefined || newIds.length !== originalElements.length) {
+          throw new Error('Some IDs of new duplicated elements are missing')
+        }
+        // We switch to select the new duplicated elements, instead of the original elements
+        dispatch({ type: 'duplicateSelectedMultipleElements', data: { elementIds: newIds } })
+      },
     },
   } as const
 
-  return { uiState, actionWithSideEffect }
+  //  return of this hook
+  return { uiState, actions }
 }
 
 function getAllElementIdsInsideRectSelector({

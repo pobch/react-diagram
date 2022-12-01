@@ -80,7 +80,7 @@ export function CanvasForSelection({
   }) => void
 }) {
   const canvasForMeasureRef = useRef<HTMLCanvasElement | null>(null)
-  const { uiState, actionWithSideEffect } = useSelectionMachine({
+  const { uiState, actions } = useSelectionMachine({
     currentSnapshot,
     commitNewSnapshot,
     replaceCurrentSnapshotByReplacingElements,
@@ -263,12 +263,19 @@ export function CanvasForSelection({
   // 2. When the history index changes, it will always re-mount this component
   //    - The history index can be changed by undo, redo, add/remove/move/resize elements
   // 3. Remove `reset` action as a valid action of some uiState (re-consider them one-by-one)
-  // 4. Remove the whole `useEffect` block below
+  // 4. Remove the whole `useRef`, `useLayoutEffect`, and `useEffect` blocks below
+
+  // need ref to avoid adding the whole `actions` object into useEffect() dep array
+  const latestActionRef = useRef(actions)
+  useLayoutEffect(() => {
+    latestActionRef.current = actions
+  })
   useEffect(() => {
+    // all possible states except 'none'
     if (
       uiState.state === 'readyToMove' ||
-      uiState.state === 'readyToResize' ||
       uiState.state === 'moving' ||
+      uiState.state === 'readyToResize' ||
       uiState.state === 'resizing' ||
       uiState.state === 'areaSelecting' ||
       uiState.state === 'singleElementSelected' ||
@@ -283,25 +290,21 @@ export function CanvasForSelection({
         selectedElementIds.length !== selectedElementsInSnapshot.length
 
       if (hasUnmatchElementInSnapshot) {
-        const reset = actionWithSideEffect.reset
-        reset()
+        latestActionRef.current[uiState.state].reset()
       }
     }
-  }, [uiState, currentSnapshot, actionWithSideEffect.reset])
+  }, [uiState, currentSnapshot])
+  // ---------------------------------------------------------
 
   const [cursorType, setCursorType] = useState<TCursorType>('default')
 
   const { handlePointerDown, handlePointerMove, handlePointerUp } = createPointerHandlers({
     uiState,
-    actionWithSideEffect,
+    actions,
     currentSnapshot,
     viewportCoordsToSceneCoords,
     setCursorType,
   })
-
-  function handleClickDeleteElement() {
-    actionWithSideEffect.removeSelectedElements({ prevState: uiState })
-  }
 
   return (
     <>
@@ -319,12 +322,17 @@ export function CanvasForSelection({
       {uiState.state === 'singleElementSelected' || uiState.state === 'multiElementSelected' ? (
         <div style={{ position: 'fixed', top: '45vh', left: '0.5rem' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <CmdButton cmdName="deleteElement" onClick={handleClickDeleteElement} />{' '}
+            <CmdButton
+              cmdName="deleteElement"
+              onClick={() => {
+                actions[uiState.state].removeSelectedElements()
+              }}
+            />{' '}
             {uiState.state === 'singleElementSelected' && (
               <CmdButton
                 cmdName="duplicate"
                 onClick={() => {
-                  actionWithSideEffect.duplicateSelectedSingleElements({
+                  actions[uiState.state].duplicateSelectedSingleElements({
                     originalElementId: uiState.data.elementId,
                   })
                 }}
@@ -334,7 +342,7 @@ export function CanvasForSelection({
               <CmdButton
                 cmdName="duplicate"
                 onClick={() => {
-                  actionWithSideEffect.duplicateSelectedMultipleElements({
+                  actions[uiState.state].duplicateSelectedMultipleElements({
                     originalElementIds: uiState.data.elementIds,
                   })
                 }}
