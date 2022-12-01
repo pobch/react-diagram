@@ -114,7 +114,12 @@ type TEvent =
 
 type TAllEventNames = TEvent['type']
 
-// Structure: { prevStateName: { eventName: { eventName: 'eventName', nextState: 'nextStateName' } }, ... }
+// Structure:
+// {
+//   [prevStateName: string]: {
+//     [validEventName: string]: { eventName: 'validEventName'; nextState: 'nextStateName' }
+//   }
+// }
 export const mapPrevToNextState = {
   none: {
     prepareMove: { eventName: 'prepareMove', nextState: 'readyToMove' },
@@ -218,12 +223,52 @@ export function useSelectionMachine({
 }) {
   const [uiState, dispatch] = useReducer(reducer, { state: 'none' })
 
+  // actions which have the same implementation no matter what prevState & eventName are
+
+  function actionOfPrepareMoveEvent({
+    sceneX,
+    sceneY,
+    elementsToMove,
+  }: {
+    sceneX: number
+    sceneY: number
+    elementsToMove: TElementData[]
+  }) {
+    dispatch({
+      type: 'prepareMove',
+      data: createMoveDataArray({
+        targetElements: elementsToMove,
+        pointerX: sceneX,
+        pointerY: sceneY,
+      }),
+    })
+  }
+
+  function actionOfPrepareDragSelectEvent({ sceneX, sceneY }: { sceneX: number; sceneY: number }) {
+    dispatch({
+      type: 'prepareDragSelect',
+      data: {
+        rectangleSelector: {
+          type: 'rectangleSelector',
+          x1: sceneX,
+          y1: sceneY,
+          x2: sceneX,
+          y2: sceneY,
+        },
+        selectedElementIds: [],
+      },
+    })
+  }
+
+  // need useCallback() because it will be used in useEffect()
   const actionOfResetEvent = useCallback(() => {
     dispatch({
       type: 'reset',
     })
   }, [])
 
+  // each action should be tied to each prevState & event combo
+  // { [prevStateName: string]: { [validEventName: string]: ActionFunction } }
   const actions = {
     none: {
       [mapPrevToNextState.none.prepareMove.eventName]: actionOfPrepareMoveEvent,
@@ -731,43 +776,6 @@ export function useSelectionMachine({
       },
     },
   } as const
-
-  // actions which have the same implementation across prevState & eventName
-
-  function actionOfPrepareMoveEvent({
-    sceneX,
-    sceneY,
-    elementsToMove,
-  }: {
-    sceneX: number
-    sceneY: number
-    elementsToMove: TElementData[]
-  }) {
-    dispatch({
-      type: 'prepareMove',
-      data: createMoveDataArray({
-        targetElements: elementsToMove,
-        pointerX: sceneX,
-        pointerY: sceneY,
-      }),
-    })
-  }
-
-  function actionOfPrepareDragSelectEvent({ sceneX, sceneY }: { sceneX: number; sceneY: number }) {
-    dispatch({
-      type: 'prepareDragSelect',
-      data: {
-        rectangleSelector: {
-          type: 'rectangleSelector',
-          x1: sceneX,
-          y1: sceneY,
-          x2: sceneX,
-          y2: sceneY,
-        },
-        selectedElementIds: [],
-      },
-    })
-  }
 
   //  return of this hook
   return { uiState, actions }
