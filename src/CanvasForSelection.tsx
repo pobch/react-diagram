@@ -264,6 +264,8 @@ export function CanvasForSelection({
   //    - The history index can be changed by undo, redo, add/remove/move/resize elements
   // 3. Remove `reset` action as a valid action of some uiState (re-consider them one-by-one)
   // 4. Remove the whole `useRef`, `useLayoutEffect`, and `useEffect` blocks below
+
+  // need ref to avoid adding the whole `actions` object into useEffect() dep array
   const latestActionRef = useRef(actions)
   useLayoutEffect(() => {
     latestActionRef.current = actions
@@ -292,6 +294,7 @@ export function CanvasForSelection({
       }
     }
   }, [uiState, currentSnapshot])
+  // ---------------------------------------------------------
 
   const [cursorType, setCursorType] = useState<TCursorType>('default')
 

@@ -523,7 +523,7 @@ export function useSelectionMachine({
             )
         }
       },
-      [mapPrevToNextState.readyToResize.selectSingleElement.eventName]: () => {
+      [mapPrevToNextState.resizing.selectSingleElement.eventName]: () => {
         const prevState = uiState
         switch (prevState.state) {
           case 'resizing':
