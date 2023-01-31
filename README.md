@@ -4,7 +4,7 @@ A diagram drawing application demonstrating how we can utilize `React` and HTML 
 
 ## Application URL
 
-https://react-diagram.netlify.app/ (should open in desktop)
+https://draw.crispyscript.com (works best in desktop)
 
 ## Demo
 
