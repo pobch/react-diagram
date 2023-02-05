@@ -1,6 +1,6 @@
-# Diagram Drawing App (not mobile friendly)
+# Diaaagram (a.k.a. react-diagram)
 
-A diagram drawing application demonstrating how we can utilize `React` and HTML `<canvas/>` to create an interactive drawing.
+A diagram drawing application which is demonstrating how we can utilize `React.js` and HTML `<canvas/>` to create an interactive drawing.
 
 ## Application URL
 
