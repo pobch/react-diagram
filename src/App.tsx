@@ -316,9 +316,8 @@ export function App() {
             <li>First, adjust the application to fit the screen size.</li>
             <li>
               You can also re-adjust the screen any time when the pointer position is inaccurate.
-              You
             </li>
-            <li>will find this button at the bottom of the page.</li>
+            <li>You will find this button at the bottom of the page.</li>
           </ul>
         </div>
       ) : null}
