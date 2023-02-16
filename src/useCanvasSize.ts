@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState } from 'react'
 
-export function useCanvasSize({ forceRedrawScene }: { forceRedrawScene: () => void }) {
+export function useCanvasSize() {
   const [canvasSize, setCanvasSize] = useState({
     // Why not window.innerWidth ? https://github.com/pobch/react-diagram/pull/35
     width: document.documentElement.clientWidth,
@@ -11,33 +11,12 @@ export function useCanvasSize({ forceRedrawScene }: { forceRedrawScene: () => vo
     height: Math.min(document.documentElement.clientHeight, window.innerHeight),
   })
 
-  const recalculateCanvasSize = useCallback(() => {
+  function recalculateCanvasSize() {
     setCanvasSize({
       width: document.documentElement.clientWidth,
       height: Math.min(document.documentElement.clientHeight, window.innerHeight),
     })
-  }, [])
-
-  useEffect(() => {
-    function resizeCanvasAndRedraw() {
-      const el = document.activeElement
-      if (
-        el?.tagName === 'TEXTAREA' ||
-        (el?.tagName === 'INPUT' && el.getAttribute('type') === 'text')
-      ) {
-        // Android triggers `resize` when a virtual keyboard shows up
-        // We want to ignore this case
-        return
-      }
-      recalculateCanvasSize()
-      forceRedrawScene()
-    }
-    window.addEventListener('resize', resizeCanvasAndRedraw)
-
-    return () => {
-      window.removeEventListener('resize', resizeCanvasAndRedraw)
-    }
-  }, [forceRedrawScene, recalculateCanvasSize])
+  }
 
   return { canvasSize, recalculateCanvasSize }
 }

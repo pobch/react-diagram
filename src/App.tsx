@@ -158,7 +158,7 @@ export function App() {
     tool,
   ])
 
-  const forceRedrawScene = useCallback(() => {
+  function forceRedrawScene() {
     // ! This is a hack
     // To redraw scene, we need to trigger useLayoutEffect().
     // ... But, there are different useLayoutEffect() living in this component and in <CanvasForSelection/>.
@@ -168,12 +168,10 @@ export function App() {
       if (prev !== 'selection') return 'selection'
       else return 'hand'
     })
-  }, [])
+  }
 
   // * --------------- Reusable renderProps ---------------
-  const { canvasSize, recalculateCanvasSize } = useCanvasSize({
-    forceRedrawScene,
-  })
+  const { canvasSize, recalculateCanvasSize } = useCanvasSize()
 
   function renderCanvas({
     onPointerDown,
@@ -317,7 +315,7 @@ export function App() {
             <li>You can also find this button at the bottom of the screen.</li>
             <li>
               While drawing, you may need to click this button to re-adjust the screen if the
-              pointer position is inaccurate.
+              pointer position is inaccurate, or you resize the browser window.
             </li>
           </ul>
         </div>
