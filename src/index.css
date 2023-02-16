@@ -23,12 +23,10 @@ button {
   border: 1px solid #0ea5e9; /* sky-500 */
   background-color: #e0f2fe; /* sky-100 */
 }
-
 button:active,
 button:hover {
   background-color: #7dd3fc; /* sky-300 */
 }
-
 button:focus-visible {
   outline: 1px solid #8b5cf6; /* violet-500 */
 }

@@ -158,8 +158,22 @@ export function App() {
     tool,
   ])
 
+  const forceRedrawScene = useCallback(() => {
+    // ! This is a hack
+    // To redraw scene, we need to trigger useLayoutEffect().
+    // ... But, there are different useLayoutEffect() living in this component and in <CanvasForSelection/>.
+    // ... There is a logic to run only one useLayoutEffect() at any time depending on which tool is selected.
+    // We decided to indirectly trigger the correct useLayoutEffect() by just switching the tool and let the existing logics handle the rest.
+    setTool((prev) => {
+      if (prev !== 'selection') return 'selection'
+      else return 'hand'
+    })
+  }, [])
+
   // * --------------- Reusable renderProps ---------------
-  const { canvasSize, recalculateCanvasSize } = useCanvasSize()
+  const { canvasSize, recalculateCanvasSize } = useCanvasSize({
+    forceRedrawScene,
+  })
 
   function renderCanvas({
     onPointerDown,
@@ -267,171 +281,220 @@ export function App() {
   }
 
   // * --------------------- Rendering -----------------------
+  const [shouldShowOverlay, setShouldShowOverlay] = useState(true)
   return (
-    <div>
-      {/* Top Menu */}
-      <fieldset
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          margin: '0.5rem',
-          padding: '0.25rem',
-          backgroundColor: 'white',
-          zIndex: zIndex[20],
-        }}
-      >
-        <legend>Tool</legend>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="selection" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="line" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="rectangle" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="pencil" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="text" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="hand" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ToolRadio toolName="arrow" currentTool={tool} setCurrentTool={setTool} />
-        </span>
-        <span style={{ paddingInlineEnd: '0.5rem' }}>
-          <ImageUploadButton
-            commitNewSnapshot={commitNewSnapshot}
-            // TODO: Take viewport coords into account(to work well with zoom), instead of hardcode x1, y1 scene
-            scenePositionToDrawImage={{ x1: originOffset.x + 100, y1: originOffset.y + 100 }}
-            onUploadSuccess={() => setTool('selection')}
-          />
-        </span>
-      </fieldset>
+    <>
+      {/* Overlay at first visit */}
+      {shouldShowOverlay ? (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+            display: 'grid',
+            placeContent: 'center',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
+            color: 'white',
+            zIndex: zIndex[30],
+          }}
+        >
+          <div style={{ textAlign: 'center' }}>
+            <CmdButton
+              iconWidth={50}
+              cmdName="fitToScreen"
+              onClick={() => {
+                recalculateCanvasSize()
+                forceRedrawScene()
+                setShouldShowOverlay(false)
+              }}
+            />
+          </div>
+          <div style={{ textAlign: 'center' }}>↑</div>
+          <ul style={{ maxWidth: 300 }}>
+            <li>First, adjust the application to fit the screen size.</li>
+            <li>
+              You can also re-adjust the screen any time when the pointer position is inaccurate.
+              You
+            </li>
+            <li>will find this button at the bottom of the page.</li>
+          </ul>
+        </div>
+      ) : null}
 
-      {/* Footer Menu */}
-      <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="undo" onClick={() => undo()} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="redo" onClick={() => redo()} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
-        </span>
-        <span style={{ paddingInlineEnd: '1rem' }}>|</span>
-        <span style={{ paddingInlineEnd: '1rem' }}>
-          <CmdButton cmdName="fitToScreen" onClick={recalculateCanvasSize} />
-        </span>
+      {/* Main App */}
+      <div>
+        {/* Top Menu */}
+        <fieldset
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            margin: '0.5rem',
+            padding: '0.25rem',
+            backgroundColor: 'white',
+            zIndex: zIndex[20],
+          }}
+        >
+          <legend>Tool</legend>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="selection" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="line" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="rectangle" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="pencil" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="text" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="hand" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ToolRadio toolName="arrow" currentTool={tool} setCurrentTool={setTool} />
+          </span>
+          <span style={{ paddingInlineEnd: '0.5rem' }}>
+            <ImageUploadButton
+              commitNewSnapshot={commitNewSnapshot}
+              // TODO: Take viewport coords into account(to work well with zoom), instead of hardcode x1, y1 scene
+              scenePositionToDrawImage={{ x1: originOffset.x + 100, y1: originOffset.y + 100 }}
+              onUploadSuccess={() => setTool('selection')}
+            />
+          </span>
+        </fieldset>
+
+        {/* Footer Menu */}
+        <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="undo" onClick={() => undo()} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="redo" onClick={() => redo()} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="clearCanvas" onClick={handleClickClearCanvas} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="zoomOut" onClick={handleClickZoomOut} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="resetPanZoom" onClick={handleClickResetPanZoom} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton cmdName="zoomIn" onClick={handleClickZoomIn} />
+          </span>
+          <span style={{ paddingInlineEnd: '1rem' }}>|</span>
+          <span style={{ paddingInlineEnd: '1rem' }}>
+            <CmdButton
+              cmdName="fitToScreen"
+              onClick={() => {
+                recalculateCanvasSize()
+                forceRedrawScene()
+              }}
+            />
+          </span>
+        </div>
+
+        {/* Canvas */}
+        {(() => {
+          switch (tool) {
+            case 'selection':
+              return (
+                <CanvasForSelection
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                  drawScene={drawScene}
+                />
+              )
+            case 'rectangle':
+              return (
+                <CanvasForRect
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                />
+              )
+            case 'line':
+              return (
+                <CanvasForLinear
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                  lineType="line"
+                />
+              )
+            case 'pencil':
+              return (
+                <CanvasForPencil
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                />
+              )
+            case 'text':
+              return (
+                <CanvasForText
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  replaceCurrentSnapshotByRemovingElement={replaceCurrentSnapshotByRemovingElement}
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                  sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
+                  zoomLevel={zoomLevel}
+                />
+              )
+            case 'hand':
+              return (
+                <CanvasForHand
+                  renderCanvas={renderCanvas}
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                  setOriginOffset={setOriginOffset}
+                />
+              )
+            case 'arrow':
+              return (
+                <CanvasForLinear
+                  renderCanvas={renderCanvas}
+                  currentSnapshot={currentSnapshot}
+                  commitNewSnapshot={commitNewSnapshot}
+                  replaceCurrentSnapshotByReplacingElements={
+                    replaceCurrentSnapshotByReplacingElements
+                  }
+                  viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
+                  lineType="arrow"
+                />
+              )
+          }
+        })()}
       </div>
-
-      {/* Canvas */}
-      {(() => {
-        switch (tool) {
-          case 'selection':
-            return (
-              <CanvasForSelection
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-                drawScene={drawScene}
-              />
-            )
-          case 'rectangle':
-            return (
-              <CanvasForRect
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-              />
-            )
-          case 'line':
-            return (
-              <CanvasForLinear
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-                lineType="line"
-              />
-            )
-          case 'pencil':
-            return (
-              <CanvasForPencil
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-              />
-            )
-          case 'text':
-            return (
-              <CanvasForText
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                replaceCurrentSnapshotByRemovingElement={replaceCurrentSnapshotByRemovingElement}
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-                sceneCoordsToViewportCoords={sceneCoordsToViewportCoords}
-                zoomLevel={zoomLevel}
-              />
-            )
-          case 'hand':
-            return (
-              <CanvasForHand
-                renderCanvas={renderCanvas}
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-                setOriginOffset={setOriginOffset}
-              />
-            )
-          case 'arrow':
-            return (
-              <CanvasForLinear
-                renderCanvas={renderCanvas}
-                currentSnapshot={currentSnapshot}
-                commitNewSnapshot={commitNewSnapshot}
-                replaceCurrentSnapshotByReplacingElements={
-                  replaceCurrentSnapshotByReplacingElements
-                }
-                viewportCoordsToSceneCoords={viewportCoordsToSceneCoords}
-                lineType="arrow"
-              />
-            )
-        }
-      })()}
-    </div>
+    </>
   )
 }
