@@ -324,7 +324,7 @@ export function App() {
       ) : null}
 
       {/* Main App */}
-      <div>
+      <div style={{ position: 'relative' }}>
         {/* Top Menu */}
         <fieldset
           style={{
