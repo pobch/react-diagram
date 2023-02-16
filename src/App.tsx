@@ -306,18 +306,19 @@ export function App() {
               cmdName="fitToScreen"
               onClick={() => {
                 recalculateCanvasSize()
-                forceRedrawScene()
+                // forceRedrawScene()
                 setShouldShowOverlay(false)
               }}
             />
           </div>
           <div style={{ textAlign: 'center' }}>↑</div>
-          <ul style={{ maxWidth: 300 }}>
-            <li>First, adjust the application to fit the screen size.</li>
+          <ul style={{ maxWidth: 400, padding: '1rem 1rem 1rem 1.5rem' }}>
+            <li>First, adjust the application size to fit the screen.</li>
+            <li>You can also find this button at the bottom of the screen.</li>
             <li>
-              You can also re-adjust the screen any time when the pointer position is inaccurate.
+              While drawing, you may need to click this button to re-adjust the screen if the
+              pointer position is inaccurate.
             </li>
-            <li>You will find this button at the bottom of the page.</li>
           </ul>
         </div>
       ) : null}
