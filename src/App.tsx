@@ -370,7 +370,7 @@ export function App() {
         </fieldset>
 
         {/* Footer Menu */}
-        <div style={{ position: 'fixed', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
+        <div style={{ position: 'absolute', bottom: 0, padding: '1rem', zIndex: zIndex[20] }}>
           <span style={{ paddingInlineEnd: '1rem' }}>
             <CmdButton cmdName="undo" onClick={() => undo()} />
           </span>
