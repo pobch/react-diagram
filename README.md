@@ -31,15 +31,21 @@ https://user-images.githubusercontent.com/19894957/165162344-d48826a6-5169-4a2c-
 - [x] Duplicate elements
 - [ ] Send to back/front
 - [ ] Save the result to file / local storage (need to serialize the image)
+- [ ] Limit max history stack to ~50 items
+- [ ] Export canvas to png/jpeg
 - [ ] Rotate
 - [ ] Keyboard shortcut
-- [ ] Export canvas to png/jpeg
 - [ ] Setting stroke color
 - [ ] Setting stroke width
 - [ ] Filled rectangle
 - [ ] Copy & Paste elements (upgrade "Duplicate" feature)
 
 ## Developer Notes
+
+### Start the app locally
+
+1. Run `yarn` to install all dependencies
+2. Run `yarn start` to start the app locally
 
 ### Steps for running visual tests
 
